@@ -59,6 +59,8 @@ These cannot be verified from a headless browser. None has been done on a physic
 - Feel, difficulty tuning and pacing are verified only by simulation, not by human playtests.
 - Headless tests render WebGL in software; frame-rate assertions are a collapse guard, not proof of
   60 FPS on phones.
+- Headless Chromium logs a "GPU stall due to ReadPixels" driver warning: it comes from the
+  software compositor presenting the canvas, not from game code (the game makes no readback calls).
 - iOS Safari has no Vibration API: no haptics in the browser on iPhone.
 - Music is generative, so it has texture and mood but no composed themes.
 - Text is English only.

@@ -93,7 +93,16 @@ export class Game implements UiHost {
     this.loadWorld(this.session.level, 'title', -1);
     this.ui.show('title');
 
-    window.addEventListener('resize', () => this.renderer.resize());
+    // Browsers only allow sound after a user gesture, and may revoke it after an interruption.
+    for (const type of ['pointerup', 'touchend', 'click', 'keydown']) {
+      window.addEventListener(type, () => this.audio.unlock(), { passive: true });
+    }
+    const sideways = window.matchMedia('(orientation: landscape) and (max-height: 480px) and (pointer: coarse)');
+    window.addEventListener('resize', () => {
+      this.renderer.resize();
+      // A phone turned on its side shows the "turn upright" card; hold the game meanwhile.
+      if (sideways.matches && this.state === 'playing' && !this.bot) this.pause();
+    });
     window.addEventListener('orientationchange', () => window.setTimeout(() => this.renderer.resize(), 200));
     document.addEventListener('visibilitychange', () => (document.hidden ? this.background() : this.foreground()));
     window.addEventListener('pagehide', () => this.background());
@@ -159,7 +168,7 @@ export class Game implements UiHost {
     else this.begin(s, -1);
   }
 
-  quitToTitle(): void {
+  quitToTitle(then?: 'chapters'): void {
     this.recordDrift();
     this.fadeThrough(() => {
       this.bot = null;
@@ -170,6 +179,7 @@ export class Game implements UiHost {
       this.hud.hideCard();
       this.setState('title');
       this.ui.show('title');
+      if (then) this.ui.push(then);
     });
   }
 

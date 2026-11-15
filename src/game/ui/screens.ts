@@ -40,7 +40,7 @@ export interface UiHost {
   resume(): void;
   retry(): void;
   restartChapter(): void;
-  quitToTitle(): void;
+  quitToTitle(then?: 'chapters'): void;
   settingsChanged(): void;
   sound(kind: 'tap' | 'open' | 'back' | 'toggle'): void;
 }
@@ -392,7 +392,7 @@ export class Ui {
       h('h2', { text: c.name }),
       c.shellIds.length ? shells : null,
       stats,
-      h('nav', { class: 'menu' }, next, this.btn('Again', () => this.host.restartChapter()), c.mode === 'story' ? this.btn('Chapters', () => this.host.quitToTitle(), 'quiet') : null),
+      h('nav', { class: 'menu' }, next, this.btn('Again', () => this.host.restartChapter()), c.mode === 'story' ? this.btn('Chapters', () => this.host.quitToTitle('chapters'), 'quiet') : null),
     );
   }
 

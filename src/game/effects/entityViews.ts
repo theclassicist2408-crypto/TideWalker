@@ -33,20 +33,17 @@ export class EntityLayer {
   private kin: Sprite[] = [];
   private kinHalo: Sprite[] = [];
   private beacon: Sprite | null = null;
-  private counts = '';
+  private world: World | null = null;
+  private count = -1;
   private emitT = 0;
 
   constructor(private readonly gfx: Gfx) {}
 
-  private signature(w: World): string {
-    return `${w.level.id}:${w.platforms.length}:${w.plants.length}:${w.fireflies.length}:${w.level.kelp.length}:${w.shells.length}`;
-  }
-
-  /** Rebuilds if the world's entity lists changed (new level or streamed chunk). */
+  /** Rebuilds if the world's entity lists changed (new level or a new World of the same level). */
   sync(w: World): void {
-    const sig = this.signature(w);
-    if (sig === this.counts) return;
-    this.counts = sig;
+    if (w === this.world && w.platforms.length + w.shells.length === this.count) return;
+    this.world = w;
+    this.count = w.platforms.length + w.shells.length;
     this.build(w);
   }
 
