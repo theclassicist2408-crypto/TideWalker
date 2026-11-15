@@ -107,6 +107,11 @@ export class InputManager {
     this.keys.delete(e.code);
   };
 
+  /** True while the player is driving with the keyboard (hints then show keys). */
+  get keyboardActive(): boolean {
+    return this.usingKeys;
+  }
+
   private held(codes: string[]): boolean {
     for (const c of codes) if (this.keys.has(c)) return true;
     return false;

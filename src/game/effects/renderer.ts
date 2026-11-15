@@ -408,7 +408,7 @@ export class GameRenderer {
     const danger = clamp(p.danger, 0, 1);
     const low = frac < P.lowLumen ? 1 - frac / P.lowLumen : 0;
     this.vignette.tint = mixColor(0x000000, 0x4a1040, danger * 0.8);
-    this.vignette.alpha = clamp(0.5 + low * 0.3 + danger * 0.22 + (p.fadeT > 0 ? 0.2 : 0), 0, 1);
+    this.vignette.alpha = clamp(0.3 + low * 0.34 + danger * 0.26 + (p.fadeT > 0 ? 0.2 : 0), 0, 1);
 
     const cue = this.options.visualCues ? near : 0;
     const pulse = 0.6 + 0.4 * Math.sin(t * 5);
