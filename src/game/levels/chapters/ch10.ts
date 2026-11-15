@@ -50,7 +50,8 @@ export function ch10(): LevelData {
   gullies(b, 2, 54, 140, 160);
   b.flat(200).kin(100, 34);
   cliff(b, 80);
-  b.flat(240).kin(150, 40).kin(60, 30).pool(120, 60);
+  rest(b, 240);
+  b.flat(240).kin(150, 40).kin(60, 30);
   // The heart of the reef opens only to light held steady.
   b.flat(180);
   b.bloomGate(50, 110);

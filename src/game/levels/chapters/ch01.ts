@@ -42,7 +42,7 @@ export function ch01(): LevelData {
   lagoon(b, 300, 98);
   b.flat(190).plant(120).fireflies(50, 30, 3);
   cliff(b, 88);
-  b.flat(170);
+  rest(b, 230);
   gullies(b, 2, 58, 130, 150);
   b.slope(280, 58);
   b.hills(260, 10, 2);
@@ -59,6 +59,7 @@ export function ch01(): LevelData {
   b.flat(260).fireflies(140, 26, 4);
   moonBridge(b, 150, 120);
   b.flat(160).plant(80);
+  rest(b, 240);
   b.hills(300, 14, 3);
   gullies(b, 3, 56, 120, 130);
   ledges(b, 2, -24, 120);
