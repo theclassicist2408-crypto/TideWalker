@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b1c" />
+    <meta name="description" content="Tidewalker — a small light crosses a drowning shoreline before nightfall." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tidewalker" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+    <title>Tidewalker</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage"></div>
+      <div id="hud" aria-hidden="true"></div>
+      <div id="ui"></div>
+      <div id="rotate" role="status">
+        <div class="rotate-icon"></div>
+        <p>Turn your device upright</p>
+      </div>
+    </div>
+    <noscript>Tidewalker needs JavaScript to run.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
