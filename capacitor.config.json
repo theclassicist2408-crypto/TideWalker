@@ -1,0 +1,23 @@
+{
+  "appId": "com.tidewalker.game",
+  "appName": "Tidewalker",
+  "webDir": "dist",
+  "backgroundColor": "#070b1c",
+  "android": {
+    "backgroundColor": "#070b1c",
+    "allowMixedContent": false
+  },
+  "ios": {
+    "backgroundColor": "#070b1c",
+    "contentInset": "never",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 600,
+      "backgroundColor": "#070b1c",
+      "showSpinner": false
+    }
+  }
+}
