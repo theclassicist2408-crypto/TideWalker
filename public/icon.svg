@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#070b1c"/>
+      <stop offset="0.55" stop-color="#1a2659"/>
+      <stop offset="1" stop-color="#3b4f8f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6dc" stop-opacity="0.95"/>
+      <stop offset="0.35" stop-color="#ffd98a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffd98a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="body" cx="0.6" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset="0.6" stop-color="#ffe2a6"/>
+      <stop offset="1" stop-color="#e9b563"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="372" cy="118" r="34" fill="#eef2ff" opacity="0.9"/>
+  <circle cx="256" cy="262" r="190" fill="url(#glow)"/>
+  <path d="M0 372 C60 356 110 388 170 372 S290 356 350 372 S460 388 512 372 V512 H0 Z" fill="#12305a"/>
+  <path d="M0 372 C60 356 110 388 170 372 S290 356 350 372 S460 388 512 372" fill="none" stroke="#bfe0ff" stroke-width="5" opacity="0.6"/>
+  <path d="M0 420 C70 404 130 436 200 420 S330 404 400 420 S480 432 512 424 V512 H0 Z" fill="#0a1f40" opacity="0.8"/>
+  <path d="M196 262 C150 250 118 268 96 304 C132 300 160 300 196 290 Z" fill="#ffe2a6"/>
+  <path d="M338 258 C338 206 292 184 250 194 C208 204 190 240 200 276 C210 312 268 318 304 308 C330 300 338 284 338 258 Z" fill="url(#body)"/>
+  <ellipse cx="292" cy="246" rx="11" ry="14" fill="#141a2e"/>
+  <ellipse cx="318" cy="250" rx="9" ry="12" fill="#141a2e"/>
+  <circle cx="296" cy="241" r="4" fill="#fff"/>
+  <circle cx="321" cy="246" r="3.4" fill="#fff"/>
+  <circle cx="252" cy="176" r="12" fill="#fff6dc"/>
+</svg>

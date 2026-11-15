@@ -344,9 +344,9 @@ export class EntityLayer {
       s.tint = d.awake ? LIGHT.kin : 0x6f8496;
       s.alpha = (d.awake ? 1 : 0.5) * fade;
       h.position.set(d.cx, d.cy + bob);
-      h.scale.set((d.awake ? 70 + Math.sin(t * 4 + i) * 6 : 22) / 128);
-      h.alpha = (d.awake ? 0.55 : 0.12 + 0.06 * Math.sin(t * 2 + i)) * fade;
-      if (d.awake) lights.add(d.cx, d.cy, 70, LIGHT.kin, 0.7 * fade);
+      h.scale.set((d.awake ? 44 + Math.sin(t * 4 + i) * 4 : 22) / 128);
+      h.alpha = (d.awake ? 0.3 : 0.12 + 0.06 * Math.sin(t * 2 + i)) * fade;
+      if (d.awake) lights.add(d.cx, d.cy, 46, LIGHT.kin, 0.32 * fade);
       else lights.add(d.cx, d.cy, 26, LIGHT.kin, 0.2);
     }
 

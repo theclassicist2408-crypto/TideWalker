@@ -149,7 +149,7 @@ export class Background {
       layer.tilePosition.x = -camX * scale * f;
       layer.position.set(0, baseY - lh * 0.55);
       const fill = this.fills[i];
-      fill.position.set(0, baseY - lh * 0.55 + lh - 1);
+      fill.position.set(0, baseY - lh * 0.55 + lh - 4 * layerScale);
       fill.width = w;
       fill.height = Math.max(0, h - fill.y + 2);
     }

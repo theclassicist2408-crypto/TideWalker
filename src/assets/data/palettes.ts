@@ -81,8 +81,8 @@ export const PALETTES: Record<BiomeId, Palette> = {
     moon: '#ece6ff',
   },
   sanctuary: {
-    sky: ['#081330', '#17406a', '#e0a963'],
-    fog: '#7a7f8c',
+    sky: ['#081330', '#23557a', '#f0b56e'],
+    fog: '#8a8a8e',
     layers: ['#4a6a86', '#284a68', '#12283f'],
     ground: 0x1c4060,
     groundDeep: 0x0c2236,

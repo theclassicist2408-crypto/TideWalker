@@ -52,25 +52,6 @@ export class Heightfield {
     }
     return best;
   }
-
-  /** Appends points (Drift Mode streams terrain). */
-  append(xs: number[], ys: number[]): void {
-    for (let i = 0; i < xs.length; i++) {
-      this.xs.push(xs[i]);
-      this.ys.push(ys[i]);
-    }
-  }
-
-  /** Drops points left of `x`, keeping one so interpolation still works. */
-  trimBefore(x: number): void {
-    let cut = 0;
-    while (cut < this.xs.length - 2 && this.xs[cut + 1] < x) cut++;
-    if (cut > 0) {
-      this.xs.splice(0, cut);
-      this.ys.splice(0, cut);
-      this.last = 0;
-    }
-  }
 }
 
 /** Sentinel "no ceiling" height. */

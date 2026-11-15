@@ -91,17 +91,22 @@ export class Ui {
   /** Hides all screens (gameplay). */
   clear(): void {
     this.stack.length = 0;
+    this.cancelTimers();
     this.swap(null);
   }
 
   private render(): void {
     const top = this.stack[this.stack.length - 1];
+    this.cancelTimers();
     this.swap(this.build(top.name, top.params));
   }
 
-  private swap(next: HTMLElement | null): void {
+  private cancelTimers(): void {
     for (const t of this.timers) window.clearTimeout(t);
     this.timers = [];
+  }
+
+  private swap(next: HTMLElement | null): void {
     const prev = this.current;
     if (prev) {
       prev.classList.remove('in');

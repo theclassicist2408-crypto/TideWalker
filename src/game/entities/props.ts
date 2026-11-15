@@ -259,8 +259,8 @@ export function updateProps(w: World, dt: number): void {
       k.cy += Math.sin(k.life * 3.1) * 22 * dt - 8 * dt;
       if (k.life > 6) k.gone = true;
     } else {
-      const tx = p.x - p.facing * (26 + (k.slot % 6) * 15);
-      const ty = p.y - 20 - (k.slot % 4) * 11 + Math.sin(k.life * 2.2 + k.slot) * 6;
+      const tx = p.x - p.facing * (30 + (k.slot % 7) * 22);
+      const ty = p.y - 18 - (k.slot % 4) * 15 + Math.sin(k.life * 2.2 + k.slot) * 7;
       k.vx += ((tx - k.cx) * 5 - k.vx * 3.2) * dt;
       k.vy += ((ty - k.cy) * 5 - k.vy * 3.2) * dt;
       k.cx += k.vx * dt;

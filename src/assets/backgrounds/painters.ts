@@ -27,8 +27,8 @@ export function paintSky(biome: BiomeId): HTMLCanvasElement {
   const [canvas, c] = makeCanvas(64, 512);
   const g = c.createLinearGradient(0, 0, 0, 512);
   g.addColorStop(0, pal.sky[0]);
-  g.addColorStop(0.5, pal.sky[1]);
-  g.addColorStop(0.86, pal.sky[2]);
+  g.addColorStop(0.34, pal.sky[1]);
+  g.addColorStop(0.6, pal.sky[2]);
   g.addColorStop(1, pal.fog);
   c.fillStyle = g;
   c.fillRect(0, 0, 64, 512);
@@ -254,5 +254,7 @@ export function paintLayer(biome: BiomeId, layer: 0 | 1 | 2): HTMLCanvasElement 
   mist.addColorStop(1, mix(pal.fog, '#ffffff', 0.06).replace('rgb', 'rgba').replace(')', `,${[0.5, 0.36, 0.2][layer]})`));
   c.fillStyle = mist;
   c.fillRect(0, base - 30, LAYER_W, LAYER_H - base + 30);
+  // The texture tiles vertically too; keep the last rows empty so they cannot bleed into the top edge.
+  c.clearRect(0, LAYER_H - 3, LAYER_W, 3);
   return canvas;
 }
