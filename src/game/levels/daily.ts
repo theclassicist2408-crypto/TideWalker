@@ -6,7 +6,6 @@ import { cliff, gullies, lagoon, ledges, moonBridge, moonStairs, rest, stones } 
 
 function skerry(): LevelData {
   const b = new LevelBuilder({ id: 'daily-skerry', index: 0, name: 'The Skerry', line: '', biome: 'pools', teaches: 'Daily', weather: { fireflies: 0.4, moon: 0.8 } });
-  b.tide([[0, 70], [20, 60], [70, 4]], 5, 7);
   b.flat(220);
   gullies(b, 2, 56, 130, 150);
   stones(b, 300, 4, 150);
@@ -18,12 +17,12 @@ function skerry(): LevelData {
   ledges(b, 2, -26, 110);
   moonStairs(b, 3, 30, 170);
   b.flat(200).pool(100).goal();
+  b.autoTide(60, 24, 5, 7);
   return b.build();
 }
 
 function causeway(): LevelData {
   const b = new LevelBuilder({ id: 'daily-causeway', index: 0, name: 'The Causeway', line: '', biome: 'ruins', teaches: 'Daily', weather: { fog: 0.4, moon: 0.6, fireflies: 0.2 } });
-  b.tide([[0, 76], [15, 66], [70, 0]], 6, 8);
   b.flat(240);
   stones(b, 260, 3, 160, true);
   b.flat(160).plant(80);
@@ -38,12 +37,12 @@ function causeway(): LevelData {
   gullies(b, 3, 58, 120, 150);
   ledges(b, 2, -28, 120);
   b.flat(200).pool(100).goal();
+  b.autoTide(60, 24, 5, 7);
   return b.build();
 }
 
 function reedbed(): LevelData {
   const b = new LevelBuilder({ id: 'daily-reedbed', index: 0, name: 'The Reedbed', line: '', biome: 'kelp', teaches: 'Daily', weather: { fog: 0.3, moon: 0.7, fireflies: 0.6 } });
-  b.tide([[0, 60], [20, 46], [75, -10]], 5, 7.5);
   b.flat(220).hills(240, 12, 2);
   lagoon(b, 420, 120, 3);
   b.fish('drifter', 330, -80, 110, -80);
@@ -58,6 +57,7 @@ function reedbed(): LevelData {
   b.flat(150).plant(60);
   stones(b, 240, 3, 150);
   b.flat(200).pool(100).goal();
+  b.autoTide(60, 24, 5, 7);
   return b.build();
 }
 

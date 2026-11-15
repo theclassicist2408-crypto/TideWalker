@@ -29,6 +29,9 @@ export class LevelBuilder {
   private optionalDepth = 0;
   private shellCount = 0;
   private goalSet = false;
+  /** Stretches meant to hold water (pits, lagoons, sunken courts); the auto-tide ignores their floors. */
+  private readonly wet: [number, number][] = [];
+  private auto: { m0: number; m1: number; amp: number; period: number; pace: number; breathAmp: number; breathPeriod: number } | null = null;
 
   constructor(meta: LevelMeta, startY = 0) {
     this.y = startY;
@@ -98,6 +101,10 @@ export class LevelBuilder {
 
   /** Vertical ledge. Negative dy steps up. */
   step(dy: number): this {
+    // A waypoint left on the old lip would now be buried in (or hang over) the new ledge.
+    const wps = this.data.waypoints;
+    const prev = wps[wps.length - 1];
+    if (prev && !prev.optional && !prev.ride && Math.abs(prev.x - this.x) <= 20) wps.pop();
     this.y += dy;
     this.point(this.x, this.y);
     this.wp(this.x + (dy < 0 ? 14 : 4), this.y - 9);
@@ -131,6 +138,7 @@ export class LevelBuilder {
     this.point(x0 + width, farY);
     this.x += width;
     this.y = farY;
+    this.wet.push([x0, this.x]);
     if (opts.rungs !== false) {
       for (let h = 46; h < nearY + depth - farY - 30; h += 46) this.data.platforms.push({ x: this.x - 24, y: farY + h, w: 24, kind: 'rock' });
       if (width >= 70) for (let h = 66; h < depth - 30; h += 46) this.data.platforms.push({ x: x0, y: nearY + h, w: 24, kind: 'rock' });
@@ -152,6 +160,7 @@ export class LevelBuilder {
     this.point(x0 + width - b, this.y + depth);
     this.point(x0 + width, this.y);
     this.x += width;
+    this.wet.push([x0, this.x]);
     this.wp(x0 + b, this.y + Math.min(depth, 30) - 9, { swim: true });
     this.wp(this.x - b, this.y + Math.min(depth, 30) - 9, { swim: true });
     this.wp(this.x - 4, this.y - 9);
@@ -194,6 +203,12 @@ export class LevelBuilder {
     this.optionalDepth++;
     fn(this);
     this.optionalDepth--;
+    return this;
+  }
+
+  /** Marks the last `len` px as ground that is meant to flood (a sunken court). */
+  floods(len: number): this {
+    this.wet.push([this.x - len, this.x]);
     return this;
   }
 
@@ -338,6 +353,49 @@ export class LevelBuilder {
     return this;
   }
 
+  /**
+   * Derives the tide from the terrain: at the pace of an unhurried player (`pace` px/s) the water
+   * stays `m0` px below the walkable shore at the start, closing to `m1` px by the goal.
+   * Dawdle and it overtakes you; hurry and the pools ahead are still shallow.
+   */
+  autoTide(m0: number, m1: number, amp = 4, period = 7, opts: { pace?: number; breathAmp?: number; breathPeriod?: number } = {}): this {
+    this.auto = { m0, m1, amp, period, pace: opts.pace ?? 66, breathAmp: opts.breathAmp ?? 0, breathPeriod: opts.breathPeriod ?? 40 };
+    return this;
+  }
+
+  private computeAutoTide(): void {
+    const a = this.auto;
+    const d = this.data;
+    if (!a) return;
+    const step = 20;
+    const n = Math.ceil(d.goalX / step) + 1;
+    // The walkable shore: ground outside the stretches that are meant to hold water.
+    const w: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const x = i * step;
+      let rim = this.groundAt(x);
+      for (const [from, to] of this.wet) {
+        if (x >= from && x <= to) {
+          rim = Math.max(this.groundAt(from - 1), this.groundAt(to + 1));
+          break;
+        }
+      }
+      w.push(rim + a.m0 + ((a.m1 - a.m0) * i) / (n - 1));
+    }
+    // The sea is level: it can only be as high as every stretch still ahead allows.
+    for (let i = n - 2; i >= 0; i--) w[i] = Math.max(w[i], w[i + 1]);
+    const keys: [number, number][] = [];
+    const every = Math.max(1, Math.round((a.pace * 9) / step));
+    for (let i = 0; i < n; i += every) {
+      const t = Math.max(0, (i * step - d.spawn.x) / a.pace);
+      if (keys.length && t <= keys[keys.length - 1][0]) continue;
+      keys.push([Math.round(t * 10) / 10, Math.round(w[i])]);
+    }
+    const endT = (d.goalX - d.spawn.x) / a.pace;
+    if (endT > keys[keys.length - 1][0] + 1) keys.push([Math.round(endT), Math.round(w[n - 1])]);
+    d.tide = { keys, amp: a.amp, period: a.period, breathAmp: a.breathAmp, breathPeriod: a.breathPeriod };
+  }
+
   spawn(x: number, up = 9): this {
     this.data.spawn = { x, y: this.groundAt(x) - up };
     return this;
@@ -354,6 +412,7 @@ export class LevelBuilder {
     const d = this.data;
     if (this.inCave) throw new Error(`${d.id}: cave left open`);
     if (!this.goalSet) d.goalX = this.x;
+    this.computeAutoTide();
     // Run-out beyond the goal so the camera has somewhere to settle.
     this.point(this.x + 420, this.y);
     d.width = this.x + 400;

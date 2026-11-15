@@ -142,6 +142,9 @@ export interface TideDef {
   /** Swell amplitude and period layered over the keyframes. */
   amp: number;
   period: number;
+  /** Optional slow rise-and-fall ("breathing") added to the keyframes; it drives current reversals. */
+  breathAmp?: number;
+  breathPeriod?: number;
 }
 
 export interface WeatherDef {

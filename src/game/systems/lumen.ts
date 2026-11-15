@@ -44,8 +44,10 @@ export function updateLumen(w: World, dt: number): void {
 
   const before = p.lumen;
   let delta = 0;
-  if (p.glowOn) delta -= d.glowDrain * w.drainScale;
-  if (p.swim && !p.inSafe && !p.inPool) delta -= d.waterDrain * w.drainScale;
+  // After repeated failures the game quietly eases the drain as well as the tide.
+  const ease = w.drainScale * (w.assist ? 0.6 : 1);
+  if (p.glowOn) delta -= d.glowDrain * ease;
+  if (p.swim && !p.inSafe && !p.inPool) delta -= d.waterDrain * ease;
   if (p.inPool) delta += POOL_REGEN;
   if (p.inSafe) delta += SAFE_REGEN;
   if (!p.swim && !p.glowOn && p.lumen < max * d.trickleTo) delta += d.trickleRate;

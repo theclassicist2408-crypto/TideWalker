@@ -27,8 +27,14 @@ export class Tide {
     this.update(0);
   }
 
-  /** Keyframed level without swell. */
+  /** Keyframed level plus the slow breath, without swell. */
   baseAt(t: number): number {
+    const amp = this.def.breathAmp ?? 0;
+    const breath = amp > 0 ? Math.sin((t / (this.def.breathPeriod ?? 40)) * Math.PI * 2) * amp : 0;
+    return this.keyAt(t) + breath;
+  }
+
+  private keyAt(t: number): number {
     const keys = this.def.keys;
     if (t <= keys[0][0]) return keys[0][1];
     const last = keys[keys.length - 1];
@@ -59,7 +65,7 @@ export class Tide {
     this.trend = delta > 0.4 ? 1 : delta < -0.4 ? -1 : 0;
     this.level = now;
     const span = this.lowest - this.highest;
-    this.progress = span > 0.001 ? (this.lowest - base) / span : 0;
+    this.progress = span > 0.001 ? Math.min(1, Math.max(0, (this.lowest - base) / span)) : 0;
   }
 
   setTime(t: number): void {

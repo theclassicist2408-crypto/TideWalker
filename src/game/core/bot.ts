@@ -17,6 +17,7 @@ export class Bot {
   private reverseT = 0;
   private last: Waypoint | null = null;
   private wasFailed = false;
+  private resting = false;
 
   constructor(
     private readonly w: World,
@@ -81,9 +82,11 @@ export class Bot {
       }
       const dx = c.x - p.x;
       const dy = c.y - p.y;
-      if (Math.abs(dx) < 15 && Math.abs(dy) < 26) {
+      // Reached — or standing right on top of a point that ended up just under the surface.
+      if (Math.abs(dx) < 15 && (Math.abs(dy) < 26 || (p.onGround && dy > 0 && dy < 70))) {
         if (c.ride) {
-          if (p.vy < -260) {
+          // Under water a vent is not needed: just swim up.
+          if (p.vy < -260 || p.swim) {
             this.advance(c);
             continue;
           }
@@ -131,9 +134,28 @@ export class Bot {
       }
     }
 
+    // Out of light before a crossing that needs it: stand and let it seep back, as a person would.
+    if (out.glow && !p.swim && p.onGround && !this.last?.glow) {
+      const need = w.diff.lumenMax * w.diff.trickleTo - 2;
+      if (p.lumen < 12) this.resting = true;
+      else if (p.lumen >= need) this.resting = false;
+      if (this.resting) {
+        out.glow = false;
+        out.mx = 0;
+        return out;
+      }
+    } else {
+      this.resting = false;
+    }
+
     if (p.swim) {
       const above = t.y < w.waterY - 6;
-      if (above) {
+      if (t.y < w.waterY - 62) {
+        // Too high to breach to: swim to the far wall and climb its rungs.
+        out.mx = 1;
+        out.my = -1;
+        if (p.y <= w.waterY + 5 && Math.abs(p.vx) < 14) out.jump = true;
+      } else if (above) {
         out.mx = dir;
         out.my = -1;
         if (p.y <= w.waterY + 5 && (Math.abs(dx) < 76 || Math.abs(p.vx) < 12)) out.jump = true;
@@ -150,7 +172,11 @@ export class Bot {
         const wall = ahead < feet - 7 && feet - ahead <= 88;
         const gap = w.ground.at(p.x + lookDir * 11) > feet + 24 && !this.platformAhead(p.x + lookDir * 11, feet);
         const higher = dy < -16;
-        if (wall && dir !== 0) out.jump = true;
+        if (dy < -96) {
+          // Down a dry hole with the way on far overhead: make for the far wall and climb its rungs.
+          out.mx = 1;
+          if (ahead < feet - 7 || Math.abs(p.vx) < 10) out.jump = true;
+        } else if (wall && dir !== 0) out.jump = true;
         else if (gap && dir !== 0 && !t.swim && t.y < p.y + 44) out.jump = true;
         else if (higher && Math.abs(dx) < this.reach(-dy)) out.jump = true;
         else {
