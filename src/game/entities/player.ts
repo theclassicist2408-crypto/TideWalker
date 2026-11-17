@@ -189,7 +189,10 @@ function landStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
   const p = w.player;
   const crown = p.crownT > 0;
   const steer = p.lockT > 0 || rooted ? 0 : inp.mx;
-  const target = rooted ? 0 : steer * P.runSpeed * (p.wading ? 0.85 : 1) * (crown ? 1.18 : 1);
+  // Wind shifts what the creature can hold in the air rather than nudging velocity, so it still
+  // bites while the stick is held against it.
+  const gust = p.onGround || rooted ? 0 : (w.level.rules.wind ?? 0) * P.windPush;
+  const target = rooted ? 0 : steer * P.runSpeed * (p.wading ? 0.85 : 1) * (crown ? 1.18 : 1) + gust;
 
   if (p.dashT > 0) {
     p.vx = p.dashDir * P.dashSpeed;
@@ -268,8 +271,6 @@ function landStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
     // Glide: a held jump while falling spreads the fins.
     p.gliding = w.has('glide') && inp.jumpHeld && !p.onGround && !p.sliding && !p.slamming && p.vy > P.glideFall && p.jumpsLeft === 0;
     if (p.gliding) p.vy = approach(p.vy, P.glideFall, 2600 * dt);
-    const wind = w.level.rules.wind ?? 0;
-    if (wind !== 0 && !p.onGround) p.vx += wind * dt;
   } else {
     p.gliding = false;
   }

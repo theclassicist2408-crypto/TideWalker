@@ -499,7 +499,9 @@ export function updateEnemies(w: World, dt: number): void {
         case 'sentinel': {
           if (e.mode === 'idle') {
             e.facing = dx >= 0 ? 1 : -1;
-            const want = sees ? (Math.abs(dx) < 120 ? -e.facing : Math.abs(dx) > 190 ? e.facing : 0) : 0;
+            // It keeps a duelling distance, but only gives ground while it is fresh: a pressed sentinel
+            // stands and fights.
+            const want = sees ? (Math.abs(dx) < 120 && e.hp > e.hpMax * 0.6 ? -e.facing : Math.abs(dx) > 190 ? e.facing : 0) : 0;
             e.vx = approach(e.vx, want * s.speed * pace, 500 * dt);
             if (sees && e.t <= 0) {
               e.a = e.a === 0 ? 1 : 0;

@@ -192,7 +192,7 @@ export function startBoss(w: World, arena: number): void {
   const id = a.boss ?? a.miniboss;
   if (!id) return;
   const def = bossDef(id);
-  const hp = Math.round(def.hp * w.diff.enemyHp);
+  const hp = Math.round(def.hp * w.diff.bossHp);
   const x = a.x1 - 110;
   const y = def.move === 'fly' ? a.y - 130 : a.y - def.r;
   w.boss = {

@@ -20,6 +20,12 @@ export class Bot {
   private reverseT = 0;
   private last: Waypoint | null = null;
   private wasFailed = false;
+
+  /** Called on a bot made fresh after a respawn: pick the route up again from the lantern. */
+  resume(): this {
+    this.wasFailed = true;
+    return this;
+  }
   private chargeHold = 0;
   private jumpWait = 0;
   private lastWall = 0;
@@ -145,7 +151,7 @@ export class Bot {
 
     // --- Fight or travel -------------------------------------------------------------------
     const foe = this.pickFoe(t);
-    if (foe) this.fight(foe, out, dt);
+    if (foe) this.fight(foe, out);
     else if (t) this.travel(t, out, dt);
     else out.mx = 1;
 
@@ -346,7 +352,7 @@ export class Bot {
     return best;
   }
 
-  private fight(f: { x: number; y: number; r: number; e: EnemyState | null }, out: Intent, dt: number): void {
+  private fight(f: { x: number; y: number; r: number; e: EnemyState | null }, out: Intent): void {
     const w = this.w;
     const p = w.player;
     const dx = f.x - p.x;
@@ -356,7 +362,6 @@ export class Bot {
     const b = e ? null : w.boss;
     const reach = P.slashReach + f.r - 8;
     const gapWant = f.r + 30;
-    void dt;
 
     if (p.swim) {
       out.mx = Math.max(-1, Math.min(1, (dx - dir * gapWant) / 20));
@@ -612,25 +617,20 @@ export function runBot(make: () => World, collect: boolean, limitSeconds = 900):
   const w = make();
   let bot = new Bot(w, collect);
   let t = 0;
-  let freeze = 0;
   while (t < limitSeconds && w.status !== 'complete') {
     if (w.hitstop > 0) {
       // Impact freeze, exactly as the game applies it.
       w.hitstop -= FIXED_DT;
-      freeze += FIXED_DT;
     } else {
       w.step(bot.update(FIXED_DT), FIXED_DT);
       w.clearEvents();
       if (w.status === 'failed' && w.player.statusT > 0.9) {
         w.respawn();
-        bot = Object.assign(new Bot(w, collect), {});
-        // Keep following the route from where the lantern is.
-        (bot as unknown as { wasFailed: boolean }).wasFailed = true;
+        bot = new Bot(w, collect).resume();
       }
     }
     t += FIXED_DT;
   }
-  void freeze;
   const taken = w.shells.filter((s) => s.taken);
   return {
     completed: w.status === 'complete',

@@ -76,19 +76,19 @@ export const LEVELS_10: LevelSpec[] = [
     rise(b, s, true);
     b.optional((o) => o.plat(170, 50, 44, 'moonglass').plat(96, 100, 44, 'moonglass').shell(74, 118, true, shellId(10, 2)));
     bench(b);
-    fight(b, [['voidling!', 'sentinel'], ['emberhusk!', 'voidling']], 520);
+    fight(b, [['voidling!', 'thornbloom'], ['emberhusk!', 'voidling']], 520);
   }, { dark: 0.26, noHeal: true }),
   L('The Herald', 'It announces him. It will announce you, too, when you fall.', 'An optional guardian guards a thicker shell', (b, s) => {
     glideGap(b);
     den(b, s, 'herald', { upgrade: 'health' }, false);
     b.secret('herald', 140, 80, 120, 90);
     rubble(b, 3);
-    fight(b, [['sentinel!', 'thornbloom!', 'stormjelly!']], 540);
+    fight(b, [['sentinel', 'thornbloom!', 'stormjelly']], 540);
   }),
   L('The Antechamber', 'Everything he has left stands in these four rooms.', 'The last gauntlet, then a stand before the doors', (b) => {
     bench(b);
-    gauntlet(b, [[['sentinel!', 'emberhusk']], [['thornbloom!', 'voidling', 'stormjelly!']], [['emberhusk!', 'sentinel!']]]);
-    holdout(b, [['sentinel', 'voidling'], ['emberhusk', 'stormjelly!'], ['sentinel!', 'thornbloom']], 28);
+    gauntlet(b, [[['sentinel', 'emberhusk']], [['thornbloom!', 'voidling', 'stormjelly!']], [['emberhusk!', 'sentinel']]]);
+    holdout(b, [['sentinel', 'voidling'], ['emberhusk', 'stormjelly!'], ['sentinel', 'thornbloom']], 28);
   }, undefined, false),
   L('The Throne', 'He drowned the moon. Take it back.', 'Final boss: the Tide King', (b, s) => {
     gaps(b, s, 2);

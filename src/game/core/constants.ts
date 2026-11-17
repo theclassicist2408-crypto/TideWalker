@@ -14,6 +14,8 @@ export const P = {
   accel: 2800,
   friction: 3400,
   airAccel: 2100,
+  /** Fraction of a level's wind (px/s) added to the air-control target. */
+  windPush: 0.3,
   gravity: 1750,
   jumpVel: 570,
   jumpCut: 0.45,
@@ -71,8 +73,10 @@ export const P = {
 export interface DifficultyTuning {
   /** Extra health masks. */
   hpBonus: number;
-  /** Multiplies enemy and boss health. */
+  /** Multiplies enemy health. */
   enemyHp: number;
+  /** Multiplies guardian health. Intense bosses hit harder and faster rather than lasting longer. */
+  bossHp: number;
   /** Multiplies enemy speed and shortens their rests. */
   enemySpeed: number;
   /** Multiplies telegraph durations: Gentle gives more warning. */
@@ -85,9 +89,9 @@ export interface DifficultyTuning {
 }
 
 export const DIFF: Record<Difficulty, DifficultyTuning> = {
-  gentle: { hpBonus: 2, enemyHp: 0.8, enemySpeed: 0.86, telegraph: 1.3, tideRate: 0.75, healAmount: 2, mercy: 1.3 },
-  standard: { hpBonus: 0, enemyHp: 1, enemySpeed: 1, telegraph: 1, tideRate: 1, healAmount: 1, mercy: 1 },
-  intense: { hpBonus: 0, enemyHp: 1.15, enemySpeed: 1.08, telegraph: 0.88, tideRate: 1.25, healAmount: 1, mercy: 0.85 },
+  gentle: { hpBonus: 2, enemyHp: 0.8, bossHp: 0.8, enemySpeed: 0.86, telegraph: 1.3, tideRate: 0.75, healAmount: 2, mercy: 1.3 },
+  standard: { hpBonus: 0, enemyHp: 1, bossHp: 1, enemySpeed: 1, telegraph: 1, tideRate: 1, healAmount: 1, mercy: 1 },
+  intense: { hpBonus: 0, enemyHp: 1.15, bossHp: 1, enemySpeed: 1.08, telegraph: 0.88, tideRate: 1.25, healAmount: 1, mercy: 0.85 },
 };
 
 export const BASE_HP = 5;
