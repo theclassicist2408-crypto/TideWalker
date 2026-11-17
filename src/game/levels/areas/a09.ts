@@ -43,7 +43,7 @@ export const LEVELS_9: LevelSpec[] = [
     b.flat(420).fish(300, -80, 120).fish(120, -50, 120, true);
     b.slope(300, -90);
   }, { dark: 0.26, flooded: true }, false),
-  L('Mute Twin', 'One of them is real.', 'An optional guardian guards a deeper light', (b, s) => {
+  L('Mute Twin', 'One of them is real.', 'Optional guardian: a blinking twin in the dark', (b, s) => {
     glideGap(b);
     den(b, s, 'mutetwin', { upgrade: 'lumen' }, false);
     b.secret('twin', 140, 80, 120, 90);
@@ -76,7 +76,7 @@ export const LEVELS_9: LevelSpec[] = [
     fight(b, [['voidling', 'voidling', 'voidling'], ['lurker!', 'stormjelly!', 'voidling']], 500);
     bloomDoor(b);
   }, { dark: 0.24, glowHunted: true }),
-  L('Lightless Maw', 'It is the dark, with teeth.', 'An optional guardian guards a thicker shell', (b, s) => {
+  L('Lightless Maw', 'It is the dark, with teeth.', 'Optional guardian: a maw that pulls you toward its spiral', (b, s) => {
     sump(b, 460, 200, 3);
     den(b, s, 'lightlessmaw', { upgrade: 'health' }, false);
     b.secret('maw', 140, 80, 120, 90);

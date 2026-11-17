@@ -378,6 +378,12 @@ export class LevelBuilder {
   }
 
   /** A resting light: checkpoint. */
+  /** Where the last lantern stands (the spawn if there is none yet). */
+  lastLantern(): number {
+    const cps = this.data.checkpoints;
+    return cps.length ? cps[cps.length - 1].x : this.data.spawn.x;
+  }
+
   checkpoint(back = 0, gentleOnly = false): this {
     const x = this.x - back;
     this.data.checkpoints.push({ x, y: this.groundAt(x) - 9, tideCap: 0, gentleOnly });

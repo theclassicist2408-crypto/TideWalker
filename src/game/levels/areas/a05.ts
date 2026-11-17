@@ -32,7 +32,7 @@ export const LEVELS_5: LevelSpec[] = [
     bench(b);
     fight(b, [['stormjelly', 'stormjelly'], ['stormjelly', 'stormjelly', 'spitter']], 500);
   }),
-  L('Galewing', 'It owns the air here. Borrow some.', 'An optional guardian guards a wider pulse', (b, s) => {
+  L('Galewing', 'It owns the air here. Borrow some.', 'Optional guardian: sweeping dives across the arena', (b, s) => {
     glideGap(b);
     den(b, s, 'galewing', { upgrade: 'pulse' }, false);
     b.secret('gale', 140, 80, 120, 90);
@@ -63,7 +63,7 @@ export const LEVELS_5: LevelSpec[] = [
     holdout(b, [['skitter!', 'stormjelly'], ['gloomwing', 'gloomwing', 'stormjelly'], ['sentinel', 'skitter']], 28);
     rise(b, s, true);
   }),
-  L('Thunder Calf', 'Young, loud, and it does not know its own strength.', 'An optional guardian guards a tide vial', (b, s) => {
+  L('Thunder Calf', 'Young, loud, and it does not know its own strength.', 'Optional guardian: charges under falling sparks', (b, s) => {
     movers(b, 3);
     den(b, s, 'thundercalf', { upgrade: 'essence' }, false);
     b.secret('calf', 140, 80, 120, 90);

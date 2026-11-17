@@ -38,7 +38,7 @@ export const LEVELS_8: LevelSpec[] = [
     fight(b, [['thornbloom', 'stormjelly'], ['burrower!', 'thornbloom', 'stormjelly']], 500);
     sump(b, 460, 200, 3);
   }),
-  L('Sporeling Queen', 'She never fights alone.', 'An optional guardian guards a wider pulse', (b, s) => {
+  L('Sporeling Queen', 'She never fights alone.', 'Optional guardian: she summons a swarm of mites', (b, s) => {
     movers(b, 3);
     den(b, s, 'sporequeen', { upgrade: 'pulse' }, false);
     b.secret('spore', 140, 80, 120, 90);
@@ -69,7 +69,7 @@ export const LEVELS_8: LevelSpec[] = [
     fight(b, [['voidling', 'thornbloom'], ['voidling', 'voidling', 'burrower']]);
     bloomDoor(b);
   }, { dark: 0.26, glowHunted: true }),
-  L('Thorn Knight', 'It was a gardener once.', 'An optional guardian guards a thicker shell', (b, s) => {
+  L('Thorn Knight', 'It was a gardener once.', 'Optional guardian: a charging knight that blinks behind you', (b, s) => {
     pond(b, 420, 170, 2);
     den(b, s, 'thornknight', { upgrade: 'health' }, false);
     b.secret('knight', 140, 80, 120, 90);

@@ -43,7 +43,7 @@ export const LEVELS_6: LevelSpec[] = [
     bench(b);
     fight(b, [['thornbloom', 'stormjelly', 'stormjelly'], ['shellback!', 'thornbloom']], 500);
   }),
-  L('Choir Urchin', 'It sings one note, and the floor answers.', 'An optional guardian guards a deeper light', (b, s) => {
+  L('Choir Urchin', 'It sings one note, and the floor answers.', 'Optional guardian: spiralling shots and spike rows', (b, s) => {
     movers(b, 3);
     den(b, s, 'choirurchin', { upgrade: 'lumen' }, false);
     b.secret('choir', 140, 80, 120, 90);
@@ -73,7 +73,7 @@ export const LEVELS_6: LevelSpec[] = [
     bench(b);
     fight(b, [['lurker!', 'stormjelly'], ['thornbloom', 'lurker', 'lurker']]);
   }, { dark: 0.26, glowHunted: true }),
-  L('Rosary Crab', 'It counts its beads on your bones.', 'An optional guardian guards a thicker shell', (b, s) => {
+  L('Rosary Crab', 'It counts its beads on your bones.', 'Optional guardian: charges and five-shot fans', (b, s) => {
     thorns(b, 3, 52);
     den(b, s, 'rosarycrab', { upgrade: 'health' }, false);
     b.secret('rosary', 140, 80, 120, 90);

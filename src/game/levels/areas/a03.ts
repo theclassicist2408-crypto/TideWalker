@@ -77,7 +77,7 @@ export const LEVELS_3: LevelSpec[] = [
     b.flat(400).fish(280, -80, 120).fish(120, -50, 120);
     b.slope(300, -90);
   }, { dark: 0.3, flooded: true }, false),
-  L('The Weeping Float', 'It hangs in the water like a held breath.', 'An optional guardian guards a deeper light', (b, s) => {
+  L('The Weeping Float', 'It hangs in the water like a held breath.', 'Optional guardian: a float that drags you toward it', (b, s) => {
     race(b, 480, 190, 240, 2);
     rise(b, s, true);
     den(b, s, 'weepingfloat', { upgrade: 'lumen' }, false);

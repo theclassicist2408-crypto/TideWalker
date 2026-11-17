@@ -1,7 +1,7 @@
 {
   "name": "tidewalker",
-  "version": "1.0.0",
-  "description": "Tidewalker — a cinematic one-thumb game about a small light crossing a drowning shoreline.",
+  "version": "2.0.0",
+  "description": "Tidewalker — a fast, boss-driven 2D action-platformer across ten drowned areas.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "verify:levels": "vitest run tests/levels.completable.test.ts",
+    "verify:levels": "vite-node scripts/verify-levels.ts",
     "icons": "node scripts/generate-icons.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"

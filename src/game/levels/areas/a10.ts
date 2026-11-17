@@ -11,7 +11,7 @@ export const AREA_10: AreaInfo = {
   weather: { rain: 0.2, wind: 0.4, lightning: true, fog: 0.3, moon: 1, fireflies: 0.8 },
   finale: (b, s, n) => {
     gaps(b, s, 2);
-    fight(b, n % 2 === 0 ? [['sentinel!', 'thornbloom!'], ['emberhusk!', 'voidling', 'stormjelly!']] : [['emberhusk!', 'sentinel'], ['sentinel!', 'voidling', 'thornbloom']], 540);
+    fight(b, n % 2 === 0 ? [['sentinel', 'thornbloom!'], ['emberhusk!', 'voidling', 'stormjelly!']] : [['emberhusk!', 'sentinel'], ['sentinel', 'voidling', 'thornbloom!']], 540);
     thorns(b, 3, 52);
   },
 };
@@ -46,7 +46,7 @@ export const LEVELS_10: LevelSpec[] = [
     vent(b, 170, 2.8);
     b.autoTide(60, 14, 5, 6, 76);
   }, { tideRush: 1.6 }, false),
-  L('Crown Guard', 'It has never once been asked to move.', 'An optional guardian guards a tide vial', (b, s) => {
+  L('Crown Guard', 'It has never once been asked to move.', 'Optional guardian: crossing beams, then a seven-shot fan', (b, s) => {
     movers(b, 3);
     den(b, s, 'crownguard', { upgrade: 'essence' }, false);
     b.secret('guard', 140, 80, 120, 90);
@@ -78,7 +78,7 @@ export const LEVELS_10: LevelSpec[] = [
     bench(b);
     fight(b, [['voidling!', 'thornbloom'], ['emberhusk!', 'voidling']], 520);
   }, { dark: 0.26, noHeal: true }),
-  L('The Herald', 'It announces him. It will announce you, too, when you fall.', 'An optional guardian guards a thicker shell', (b, s) => {
+  L('The Herald', 'It announces him. It will announce you, too, when you fall.', 'Optional guardian: blinks, then rains light', (b, s) => {
     glideGap(b);
     den(b, s, 'herald', { upgrade: 'health' }, false);
     b.secret('herald', 140, 80, 120, 90);

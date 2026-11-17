@@ -44,7 +44,7 @@ export const LEVELS_7: LevelSpec[] = [
     vent(b, 160, 2.8);
     glideGap(b);
   }),
-  L('Slagback', 'It carries the old furnace on its shoulders.', 'An optional guardian guards a tide vial', (b, s) => {
+  L('Slagback', 'It carries the old furnace on its shoulders.', 'Optional guardian: slams under a rain of slag', (b, s) => {
     movers(b, 3);
     den(b, s, 'slagback', { upgrade: 'essence' }, false);
     b.secret('slag', 140, 80, 120, 90);
@@ -78,7 +78,7 @@ export const LEVELS_7: LevelSpec[] = [
     bench(b);
     fight(b, [['emberhusk', 'sentinel'], ['emberhusk', 'spitter!', 'spitter']], 520);
   }, { dark: 0.26 }),
-  L('Bellows Eel', 'It lives in the pipes and comes out angry.', 'An optional guardian guards a deeper light', (b, s) => {
+  L('Bellows Eel', 'It lives in the pipes and comes out angry.', 'Optional guardian: beams from the pipes, then dives', (b, s) => {
     vent(b, 170, 3);
     den(b, s, 'bellowseel', { upgrade: 'lumen' }, false);
     b.secret('eel', 140, 80, 120, 90);

@@ -81,7 +81,7 @@ export const LEVELS_2: LevelSpec[] = [
     fight(b, [['lurker', 'lurker'], ['gloomwing', 'shellback', 'lurker']]);
     glassBridge(b, 200);
   }, { dark: 0.28 }),
-  L("Heron's Reach", 'It stands in the pool and waits for something small.', 'An optional guardian guards a thicker shell', (b, s) => {
+  L("Heron's Reach", 'It stands in the pool and waits for something small.', 'Optional guardian: a heron that dives from above', (b, s) => {
     crumbles(b, 3);
     rise(b, s);
     den(b, s, 'paleheron', { upgrade: 'health' }, false);

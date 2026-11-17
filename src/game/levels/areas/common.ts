@@ -1,5 +1,6 @@
 import type { BiomeId, LevelData, LevelRules, WeatherDef } from '../../core/types';
 import { LevelBuilder } from '../builder';
+import { bench } from '../motifs';
 import { Stage } from '../progress';
 
 export interface AreaInfo {
@@ -35,7 +36,11 @@ export function buildLevel(area: AreaInfo, n: number, spec: LevelSpec): LevelDat
   b.flat(240);
   spec.build(b, s);
   // Every level closes with a last stretch in the area's own voice, so none is over in seconds.
-  if (spec.finale !== false && area.finale) area.finale(b, s, n);
+  // A lantern ahead of it means a fall there does not cost the whole level.
+  if (spec.finale !== false && area.finale) {
+    if (b.x - b.lastLantern() > 600) bench(b, 160);
+    area.finale(b, s, n);
+  }
   b.flat(240).pool(120, 46);
   b.goal();
   return b.build();

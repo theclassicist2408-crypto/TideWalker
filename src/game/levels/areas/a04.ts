@@ -78,7 +78,7 @@ export const LEVELS_4: LevelSpec[] = [
     fight(b, [['burrower', 'burrower'], ['shellback', 'gloomwing', 'burrower']]);
     crumbles(b, 3);
   }, { dark: 0.28 }),
-  L('The Bell Diver', 'It rings when it lands.', 'An optional guardian guards a thicker shell', (b, s) => {
+  L('The Bell Diver', 'It rings when it lands.', 'Optional guardian: ground slams and rising spikes', (b, s) => {
     glideGap(b);
     den(b, s, 'belldiver', { upgrade: 'health' }, false);
     b.secret('bell', 140, 80, 120, 90);

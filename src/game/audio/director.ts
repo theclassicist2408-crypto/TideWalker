@@ -5,7 +5,7 @@ import { approach, clamp } from '../core/util';
 export interface AudioInputs {
   mode: GameMode;
   biome: BiomeId;
-  /** 0..1 proximity/awareness of the nearest shadow-fish. */
+  /** 0..1: how close and how alert the nearest threat is. */
   danger: number;
   /** 0 low tide … 1 high tide. */
   tide: number;
@@ -16,7 +16,7 @@ export interface AudioInputs {
   rain: number;
   wind: number;
   paused: boolean;
-  /** True on menus (title, chapter select …). */
+  /** True on menus (title, area and level select …). */
   menu: boolean;
   /** A guardian is being fought. */
   boss: boolean;
@@ -42,7 +42,8 @@ export const SILENT_MIX: AudioMix = { explore: 0, tension: 0, danger: 0, relief:
 
 /** Pure mapping from game state to layer targets. No smoothing, no Web Audio. */
 export function targetMix(i: AudioInputs, relief: number, out: AudioMix): AudioMix {
-  const sanctuary = i.biome === 'throne' || i.mode === 'drift';
+  // Drift Mode is the one place with nothing to fear.
+  const sanctuary = i.mode === 'drift';
   const calmMode = i.mode === 'drift' || i.mode === 'title' || i.menu;
   const danger = calmMode ? 0 : clamp((i.danger - 0.3) / 0.55, 0, 1);
   const lowLight = i.lumen < 0.3 ? (0.3 - i.lumen) / 0.3 : 0;
