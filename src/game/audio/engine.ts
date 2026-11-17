@@ -474,7 +474,11 @@ export class AudioEngine {
         this.burst({ dur: 0.2, freq: 700, to: 2600, gain: 0.12, pan });
         break;
       case 'slash':
-        this.burst({ dur: 0.09, freq: 2600, to: 900, gain: 0.09, pan });
+        // Each step of a combo sounds a little lower; the finisher is a heavy whoosh.
+        if (v === 4) {
+          this.burst({ dur: 0.16, freq: 1700, to: 500, gain: 0.15, pan });
+          this.tone({ freq: 180, to: 90, dur: 0.14, gain: 0.08, type: 'triangle', pan });
+        } else this.burst({ dur: 0.09, freq: v === 3 ? 2200 : 2600, to: v === 3 ? 760 : 900, gain: 0.09, pan });
         break;
       case 'chargeReady':
         this.tone({ freq: 660, to: 990, dur: 0.16, gain: 0.07, wet: 0.4 });

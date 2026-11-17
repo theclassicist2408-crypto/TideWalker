@@ -78,7 +78,7 @@ export const LEVELS_8: LevelSpec[] = [
   }),
   L('Overgrowth', 'Hold the clearing. Everything is coming.', 'Survive an ambush from every side', (b, s) => {
     gaps(b, s, 2);
-    holdout(b, [['burrower', 'mite', 'mite'], ['thornbloom', 'voidling'], ['burrower', 'mite']], 26);
+    holdout(b, [['burrower', 'mite', 'mite'], ['voidling', 'mite'], ['burrower', 'mite']], 24);
     thorns(b, 3, 52);
   }),
   L('The Root', 'All of it is her.', 'Boss: the Rootmother', (b) => {

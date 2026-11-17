@@ -52,6 +52,12 @@ export const P = {
   slashReach: 48,
   slashHeight: 44,
   slashDamage: 10,
+  /** A strike pressed this long before the last one ends still comes out. */
+  attackBuffer: 0.22,
+  /** Time after a side strike in which the next continues the combo. */
+  comboWindow: 0.55,
+  /** Damage of the third strike in a combo. */
+  finisherMul: 1.3,
   pogoVel: 480,
   chargeTime: 0.55,
   chargeDamage: 34,

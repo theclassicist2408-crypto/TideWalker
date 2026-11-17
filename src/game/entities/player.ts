@@ -128,7 +128,11 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
   const styles = w.load.styles;
   p.comboT = Math.max(0, p.comboT - dt);
   p.sinceDash = p.dashT > 0 ? 0 : p.sinceDash + dt;
-  if (inp.attack && p.slashCd <= 0 && !rooted) {
+  // A press during the swing before is remembered, so mashing the button chains cleanly.
+  if (inp.attack) p.attackBuf = P.attackBuffer;
+  else p.attackBuf = Math.max(0, p.attackBuf - dt);
+  if (p.attackBuf > 0 && p.slashCd <= 0 && !rooted) {
+    p.attackBuf = 0;
     p.slashDir = inp.my < -0.5 ? 'up' : inp.my > 0.5 && !p.onGround && !p.swim ? 'down' : 'side';
     p.slashT = P.slashTime;
     p.slashCd = P.slashCooldown * sword.speed * (crown ? 0.7 : 1);
@@ -136,14 +140,21 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
     p.charged = false;
     p.slashMul = 1;
     p.slashReach = sword.reach;
-    // Techniques learned at the Forge change what a plain strike does.
+    // Side strikes chain: cut, back-cut, then a heavy finisher with a step forward. The Third Cut
+    // technique makes that finisher far stronger. Techniques change what other strikes do too.
+    let swing = 0;
     if (p.slashDir === 'side') {
       p.comboN = p.comboT > 0 ? p.comboN + 1 : 1;
-      p.comboT = 0.5;
-      if (styles.has('combo') && p.comboN >= 3) {
+      p.comboT = P.comboWindow;
+      swing = p.comboN === 2 ? 3 : 0;
+      if (p.comboN >= 3) {
         p.comboN = 0;
-        p.slashMul = 1.5;
-        p.slashReach *= 1.3;
+        swing = 4;
+        const third = styles.has('combo');
+        p.slashMul = third ? 1.8 : P.finisherMul;
+        p.slashReach *= third ? 1.35 : 1.15;
+        p.slashCd *= 1.35;
+        if (p.onGround) p.vx += p.facing * 150;
         w.emit('finisher', p.x, p.y, p.facing);
       }
       if (styles.has('dashcut') && p.sinceDash < 0.15) {
@@ -159,7 +170,8 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
     } else if (p.slashDir === 'down' && styles.has('plunge')) {
       p.slashMul = 2;
     }
-    w.emit('slash', p.x, p.y, p.slashDir === 'up' ? 1 : p.slashDir === 'down' ? 2 : 0);
+    // The event says which swing it was: 0 cut, 1 up, 2 down, 3 back-cut, 4 finisher.
+    w.emit('slash', p.x, p.y, p.slashDir === 'up' ? 1 : p.slashDir === 'down' ? 2 : swing);
   }
   if (w.has('charge') && inp.attackHeld && !rooted) {
     const before = p.chargeT;

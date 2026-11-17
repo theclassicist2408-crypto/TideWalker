@@ -2,22 +2,24 @@ import { newIntent, type Intent } from '../core/types';
 import { Controls, type ControlButton } from './controls';
 import { GamepadReader, PAD } from './gamepad';
 
+/**
+ * Keyboard: everything sits around WASD so the left hand never travels. The mouse adds strike
+ * (left button) and light (right button) for the right hand.
+ */
 const KEYS: Record<string, ControlButton> = {
   Space: 'jump',
-  KeyZ: 'jump',
   KeyX: 'attack',
   KeyJ: 'attack',
-  KeyC: 'dash',
-  KeyK: 'dash',
   ShiftLeft: 'dash',
-  KeyV: 'light',
-  KeyL: 'light',
+  ShiftRight: 'dash',
   KeyE: 'light',
-  KeyH: 'heal',
-  KeyR: 'heal',
+  KeyQ: 'heal',
   KeyF: 'ability',
-  KeyG: 'item',
+  KeyR: 'item',
 };
+/** Switch gift / switch relic. */
+const CYCLE_GIFT = 'Digit1';
+const CYCLE_RELIC = 'Digit2';
 const DIRS: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
   KeyA: [-1, 0],
@@ -59,11 +61,33 @@ export class InputManager {
   /** Called each frame a gamepad asks to move through a menu (-1 back, +1 forward), choose or go back. */
   onMenu: ((action: 'prev' | 'next' | 'choose' | 'back') => void) | null = null;
 
-  constructor(pad: HTMLElement) {
+  constructor(pad: HTMLElement, field: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', () => this.release());
     this.bindPad(pad);
+    this.bindMouse(field);
+  }
+
+  /** Mouse on the play field: left button strikes (hold to charge), right button is light. */
+  private bindMouse(field: HTMLElement): void {
+    const button = (b: number): ControlButton | null => (b === 0 ? 'attack' : b === 2 ? 'light' : null);
+    field.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      this.first();
+      const name = button(e.button);
+      if (!this.enabled || !name) return;
+      e.preventDefault();
+      this.usingKeys = true;
+      this.controls.press(name, e.timeStamp);
+    });
+    window.addEventListener('pointerup', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const name = button(e.button);
+      if (name) this.controls.release(name, e.timeStamp);
+    });
+    // Right-click is a game button here, not a menu.
+    field.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   get keyboardActive(): boolean {
@@ -184,11 +208,11 @@ export class InputManager {
       }
       return;
     }
-    if (e.code === 'KeyQ') {
+    if (e.code === CYCLE_GIFT) {
       if (!e.repeat) this.onCycle?.();
       return;
     }
-    if (e.code === 'KeyT') {
+    if (e.code === CYCLE_RELIC) {
       if (!e.repeat) this.onCycleRelic?.();
       return;
     }

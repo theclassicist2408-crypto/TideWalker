@@ -373,7 +373,7 @@ export class Ui {
       h('h3', { class: 'forge-h', text: 'Techniques' }),
       styles,
       h('h3', { class: 'forge-h', text: 'Relics' }),
-      h('p', { class: 'note', text: 'One-time powers found in chests. Tap the relic badge in play (G on a keyboard, T to switch).' }),
+      h('p', { class: 'note', text: 'One-time powers found in chests. Tap the relic badge in play (R on a keyboard, 2 to switch).' }),
       relics,
     );
   }

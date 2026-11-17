@@ -63,7 +63,6 @@ export class CreatureView {
   private readonly tage = new Float32Array(TRAIL).fill(9);
   private thead = 0;
   private readonly swing: Swing = { t: -1, dur: 0.2, a0: 0, a1: 0, big: false };
-  private backhand = false;
   private angle = 2.3;
   private sx = 1;
   private sy = 1;
@@ -110,27 +109,39 @@ export class CreatureView {
     this.sword.texture = this.gfx.tex(`sword_${id}`);
   }
 
-  /** Starts a swing: 0 side, 1 up, 2 down. Side swings alternate forehand and backhand. */
-  startSwing(dir: number, big: boolean): void {
+  /**
+   * Starts a swing. `kind` is the strike: 0 cut, 1 up, 2 down, 3 back-cut, 4 combo finisher.
+   * The cut falls from high behind to low in front; the back-cut sweeps back up; the finisher is
+   * a full overhead arc with a longer, brighter blade.
+   */
+  startSwing(kind: number, big: boolean): void {
     const s = this.swing;
     s.t = 0;
-    s.big = big;
-    s.dur = big ? 0.26 : 0.17;
-    if (dir === 1) {
+    s.big = big || kind === 4;
+    s.dur = big ? 0.26 : kind === 4 ? 0.24 : 0.16;
+    if (kind === 1) {
       s.a0 = 1.5;
       s.a1 = -1.7;
-    } else if (dir === 2) {
+    } else if (kind === 2) {
       s.a0 = 1.2;
       s.a1 = 4.1;
     } else if (big) {
       s.a0 = -2.3;
       s.a1 = 2.9;
+    } else if (kind === 4) {
+      s.a0 = -3.0;
+      s.a1 = 3.3;
+      this.sx = 1.25;
+      this.sy = 0.85;
+    } else if (kind === 3) {
+      s.a0 = 2.5;
+      s.a1 = -1.1;
+      this.sx = 1.1;
     } else {
-      this.backhand = !this.backhand;
-      s.a0 = this.backhand ? 2.5 : -1.5;
-      s.a1 = this.backhand ? -1.1 : 2.6;
+      s.a0 = -1.5;
+      s.a1 = 2.6;
+      this.sx = 1.12;
     }
-    if (!big && dir === 0) this.sx = 1.12;
   }
 
   reset(x: number, y: number): void {

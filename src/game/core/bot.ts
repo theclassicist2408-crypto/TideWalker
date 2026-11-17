@@ -104,6 +104,18 @@ export class Bot {
 
     // --- Route -----------------------------------------------------------------------------
     const wps = w.level.waypoints;
+    // Already standing at a later point (a vent or a current carried us there): jump ahead,
+    // as long as nothing skipped is a fight or something we were sent to collect.
+    if (p.onGround) {
+      for (let k = 1; k <= 3 && this.index + k < wps.length; k++) {
+        const n = wps[this.index + k];
+        if (Math.abs(n.x - p.x) >= 15 || Math.abs(n.y - p.y) >= 26) continue;
+        let safe = true;
+        for (let j = this.index; j < this.index + k; j++) if (wps[j].arena !== undefined || (wps[j].optional && this.collect)) safe = false;
+        if (safe) this.index += k;
+        break;
+      }
+    }
     let t: Waypoint | null = null;
     while (this.index < wps.length) {
       const c = wps[this.index];
@@ -144,7 +156,8 @@ export class Bot {
         this.advance(c);
         continue;
       }
-      if (!this.isMust(c) && p.x > c.x + 34) {
+      // Passed it by — unless it is a ledge well above us that we walked under.
+      if (!this.isMust(c) && p.x > c.x + 34 && p.y < c.y + 30) {
         this.advance(c);
         continue;
       }
@@ -188,7 +201,7 @@ export class Bot {
     const dx = tx - p.x;
     const dy = t.y - p.y;
     let dir = Math.abs(dx) > 4 ? Math.sign(dx) : 0;
-    // Standing on the lip right above the next point: step off.
+    // Standing on the lip right above the next point: step off on the side that drops away.
     if (dir === 0 && dy > 30 && p.onGround) dir = 1;
     if (this.reverseT > 0) {
       this.reverseT -= dt;
@@ -587,7 +600,9 @@ export class Bot {
 
   private unstick(out: Intent, dt: number): Intent {
     const p = this.w.player;
-    if (this.index !== this.markIndex || Math.abs(p.x - this.markX) > 24 || Math.abs(p.y - this.markY) > 40) {
+    // Progress is a new point, ground covered, or standing at a new height (bouncing in place is not).
+    const newHeight = (p.onGround || p.swim) && Math.abs(p.y - this.markY) > 40;
+    if (this.index !== this.markIndex || Math.abs(p.x - this.markX) > 24 || newHeight) {
       this.markIndex = this.index;
       this.markX = p.x;
       this.markY = p.y;

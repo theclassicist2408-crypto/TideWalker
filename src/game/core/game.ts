@@ -79,7 +79,7 @@ export class Game implements UiHost {
   async start(): Promise<void> {
     await this.renderer.init(this.stage);
     this.hud = new Hud(this.hudRoot);
-    this.input = new InputManager(this.hud.pad);
+    this.input = new InputManager(this.hud.pad, this.stage);
     this.input.onFirstGesture = () => this.audio.unlock();
     this.input.onPauseKey = () => this.togglePause();
     this.input.onCycle = () => this.cycleGift();

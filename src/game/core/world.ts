@@ -103,6 +103,8 @@ export interface PlayerState {
   /** Quick side strikes in a row (the Third Cut technique), and time left to continue the run. */
   comboN: number;
   comboT: number;
+  /** A strike pressed early, waiting for the blade to come back. */
+  attackBuf: number;
   /** Seconds since the last dash ended (Dash Strike). */
   sinceDash: number;
   /** Damage and reach multipliers of the swing in progress. */
@@ -517,6 +519,7 @@ export class World {
       safeY: y,
       comboN: 0,
       comboT: 0,
+      attackBuf: 0,
       sinceDash: 9,
       slashMul: 1,
       slashReach: 1,
