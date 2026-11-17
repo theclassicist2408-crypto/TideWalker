@@ -1,20 +1,21 @@
-import type { BiomeId, CurrentDef, FishKind, HintKind, LevelData, TideDef, Waypoint, WeatherDef } from '../core/types';
+import type { AbilityId, ArenaDef, BiomeId, CurrentDef, EnemyKind, HintKind, LevelData, LevelRules, PlatformDef, TideDef, UpgradeId, Waypoint, WeatherDef } from '../core/types';
 import { OPEN_SKY } from '../systems/terrain';
 
 export interface LevelMeta {
   id: string;
+  area: number;
   index: number;
   name: string;
   line: string;
   biome: BiomeId;
-  teaches: string;
+  twist: string;
+  rules?: LevelRules;
   weather?: Partial<WeatherDef>;
 }
 
 const DEFAULT_WEATHER: WeatherDef = { rain: 0, wind: 0.2, lightning: false, fog: 0.2, moon: 0.8, fireflies: 0.3 };
-
-/** Average speed used to turn distance into the tide time a checkpoint is allowed to keep. */
-const PAR_SPEED = 80;
+const PAR_SPEED = 120;
+const FLYERS: EnemyKind[] = ['gloomwing', 'stormjelly', 'voidling'];
 
 /**
  * Cursor-based level authoring. Terrain calls extend the ground to the right and move the cursor;
@@ -29,25 +30,28 @@ export class LevelBuilder {
   private optionalDepth = 0;
   private shellCount = 0;
   private goalSet = false;
-  /** Stretches meant to hold water (pits, lagoons, sunken courts); the auto-tide ignores their floors. */
   private readonly wet: [number, number][] = [];
-  private auto: { m0: number; m1: number; amp: number; period: number; pace: number; breathAmp: number; breathPeriod: number } | null = null;
+  private auto: { m0: number; m1: number; amp: number; period: number; pace: number } | null = null;
 
   constructor(meta: LevelMeta, startY = 0) {
     this.y = startY;
     this.data = {
       id: meta.id,
+      area: meta.area,
       index: meta.index,
       name: meta.name,
       line: meta.line,
       biome: meta.biome,
-      teaches: meta.teaches,
+      twist: meta.twist,
+      rules: meta.rules ?? {},
       width: 0,
       groundX: [-400, 0],
       groundY: [startY, startY],
       ceilX: [],
       ceilY: [],
       platforms: [],
+      blocks: [],
+      spikes: [],
       currents: [],
       kelp: [],
       pools: [],
@@ -59,12 +63,14 @@ export class LevelBuilder {
       stones: [],
       shells: [],
       checkpoints: [],
-      fish: [],
+      enemies: [],
+      arenas: [],
+      grants: [],
       hints: [],
       secrets: [],
       kin: [],
       waypoints: [],
-      tide: { keys: [[0, startY + 90]], amp: 3, period: 7 },
+      tide: { keys: [[0, startY + 400]], amp: 3, period: 7 },
       weather: { ...DEFAULT_WEATHER, ...meta.weather },
       spawn: { x: 60, y: startY - 9 },
       goalX: 0,
@@ -84,10 +90,11 @@ export class LevelBuilder {
     this.data.waypoints.push(w);
   }
 
-  flat(len: number): this {
+  /** Level ground. `mark: false` leaves no waypoint (when the route is about to go somewhere else). */
+  flat(len: number, mark = true): this {
     this.x += len;
     this.point(this.x, this.y);
-    this.wp(this.x - 4, this.y - 9);
+    if (mark) this.wp(this.x - 4, this.y - 9);
     return this;
   }
 
@@ -99,19 +106,17 @@ export class LevelBuilder {
     return this;
   }
 
-  /** Vertical ledge. Negative dy steps up. */
-  step(dy: number): this {
-    // A waypoint left on the old lip would now be buried in (or hang over) the new ledge.
+  /** Vertical ledge. Negative dy steps up. `act` tells the bot which skill the climb needs. */
+  step(dy: number, act?: Waypoint['act']): this {
     const wps = this.data.waypoints;
     const prev = wps[wps.length - 1];
-    if (prev && !prev.optional && !prev.ride && Math.abs(prev.x - this.x) <= 20) wps.pop();
+    if (prev && !prev.optional && !prev.ride && prev.arena === undefined && Math.abs(prev.x - this.x) <= 20) wps.pop();
     this.y += dy;
     this.point(this.x, this.y);
-    this.wp(this.x + (dy < 0 ? 14 : 4), this.y - 9);
+    this.wp(this.x + (dy < 0 ? 14 : 4), this.y - 9, act ? { act } : {});
     return this;
   }
 
-  /** Rolling ground that ends at the height it started. */
   hills(len: number, amp: number, bumps = 2): this {
     const n = bumps * 6;
     const y0 = this.y;
@@ -125,11 +130,8 @@ export class LevelBuilder {
     return this;
   }
 
-  /**
-   * Sheer-walled pit. Rungs on both walls guarantee a way back out at any tide.
-   * `swim` routes the bot through the water instead of over it.
-   */
-  pit(width: number, depth: number, opts: { rungs?: boolean; swim?: boolean; farDy?: number } = {}, over?: (b: this) => void): this {
+  /** Sheer-walled pit. Rungs on the walls give a way back out. */
+  pit(width: number, depth: number, opts: { rungs?: boolean; swim?: boolean; farDy?: number; act?: Waypoint['act'] } = {}, over?: (b: this) => void): this {
     const x0 = this.x;
     const nearY = this.y;
     const farY = this.y + (opts.farDy ?? 0);
@@ -148,7 +150,7 @@ export class LevelBuilder {
       this.wp(this.x - 24, Math.max(nearY, farY) + 24, { swim: true });
     }
     if (over) over(this);
-    this.wp(this.x + 12, this.y - 9);
+    this.wp(this.x + 12, this.y - 9, opts.act ? { act: opts.act } : {});
     return this;
   }
 
@@ -167,7 +169,6 @@ export class LevelBuilder {
     return this;
   }
 
-  /** Starts a cave roof `h` px above the ground at the cursor. */
   caveStart(h: number): this {
     if (this.inCave) throw new Error(`${this.data.id}: cave already open`);
     this.inCave = true;
@@ -180,7 +181,6 @@ export class LevelBuilder {
     return this;
   }
 
-  /** Adds a roof vertex `h` px above the ground at the cursor. */
   roof(h: number, back = 0): this {
     if (!this.inCave) throw new Error(`${this.data.id}: roof outside cave`);
     this.data.ceilX.push(this.x - back);
@@ -198,7 +198,6 @@ export class LevelBuilder {
 
   // ---- route helpers ---------------------------------------------------------------------
 
-  /** Everything placed inside is a detour for the collector bot only. */
   optional(fn: (b: this) => void): this {
     this.optionalDepth++;
     fn(this);
@@ -206,21 +205,17 @@ export class LevelBuilder {
     return this;
   }
 
-  /** Marks the last `len` px as ground that is meant to flood (a sunken court). */
   floods(len: number): this {
     this.wet.push([this.x - len, this.x]);
     return this;
   }
 
-  /** Explicit waypoint for the verification bot. */
   via(back: number, up: number, extra: Partial<Waypoint> = {}): this {
     this.wp(this.x - back, this.y - up, extra);
     return this;
   }
 
-  // ---- entities --------------------------------------------------------------------------
-
-  private groundAt(x: number): number {
+  groundAt(x: number): number {
     const xs = this.data.groundX;
     const ys = this.data.groundY;
     for (let i = xs.length - 2; i >= 0; i--) {
@@ -232,13 +227,83 @@ export class LevelBuilder {
     return ys[0];
   }
 
-  plat(back: number, up: number, w: number, kind: 'rock' | 'moonglass' | 'crumble' = 'rock', route = true): this {
+  // ---- solids and hazards ----------------------------------------------------------------
+
+  plat(back: number, up: number, w: number, kind: PlatformDef['kind'] = 'rock', route = true, move?: { dx?: number; dy?: number; period: number }): this {
     const x = this.x - back;
     const y = this.y - up;
-    this.data.platforms.push({ x, y, w, kind });
+    this.data.platforms.push({ x, y, w, kind, ...move });
     if (route) this.wp(x + w / 2, y - 9, kind === 'moonglass' ? { glow: true } : {});
     return this;
   }
+
+  /** Solid rectangle whose top is `up` px above the cursor's ground. */
+  block(back: number, up: number, w: number, h: number, kind: 'rock' | 'cracked' = 'rock'): this {
+    this.data.blocks.push({ x: this.x - back, y: this.y - up, w, h, kind });
+    return this;
+  }
+
+  /** A strip of spikes on the ground. */
+  spikes(back: number, w: number, up = 0): this {
+    const x = this.x - back;
+    this.data.spikes.push({ x, y: (up === 0 ? this.groundAt(x + w / 2) : this.y - up) - 10, w, h: 10 });
+    return this;
+  }
+
+  // ---- combat ----------------------------------------------------------------------------
+
+  /** A roaming foe, leashed to `range` px either side of where it stands. */
+  foe(kind: EnemyKind, back: number, range = 110, elite = false): this {
+    const x = this.x - back;
+    const y = this.groundAt(x) - (FLYERS.includes(kind) ? 96 : 14);
+    this.data.enemies.push({ kind, x, y, x0: x - range, x1: x + range, elite });
+    return this;
+  }
+
+  /** An underwater foe at a depth below the cursor's ground. */
+  fish(back: number, down: number, range = 130, elite = false): this {
+    const x = this.x - back;
+    this.data.enemies.push({ kind: 'needlefish', x, y: this.y + down, x0: x - range, x1: x + range, elite });
+    return this;
+  }
+
+  /**
+   * A combat arena: flat ground, gates that close while it is fought, enemies arriving in waves.
+   * Elite foes are written with a trailing `!` (for example `'shellback!'`).
+   */
+  arena(width: number, waves: string[][], opts: { lock?: boolean; survive?: number; miniboss?: string; boss?: string } = {}): this {
+    const x0 = this.x;
+    const index = this.data.arenas.length;
+    this.x += width;
+    this.point(this.x, this.y);
+    const def: ArenaDef = { x0, x1: this.x, y: this.y, waves: waves.length, lock: opts.lock !== false, survive: opts.survive, miniboss: opts.miniboss, boss: opts.boss };
+    this.data.arenas.push(def);
+    if (def.lock) {
+      this.data.gates.push({ x: x0 + 8, y: this.y, h: 420, kind: 'arena', arena: index });
+      this.data.gates.push({ x: this.x - 8, y: this.y, h: 420, kind: 'arena', arena: index });
+    }
+    waves.forEach((wave, wi) => {
+      wave.forEach((name, k) => {
+        const elite = name.endsWith('!');
+        const kind = (elite ? name.slice(0, -1) : name) as EnemyKind;
+        const x = x0 + width * (0.34 + (0.52 * (k + 1)) / (wave.length + 1));
+        const y = this.y - (FLYERS.includes(kind) ? 110 : 14);
+        this.data.enemies.push({ kind, x, y, x0: x0 + 34, x1: this.x - 34, elite, arena: index, wave: wi });
+      });
+    });
+    this.wp(x0 + 70, this.y - 9, { arena: index });
+    this.wp(this.x - 4, this.y - 9);
+    return this;
+  }
+
+  /** A shrine that restores an ability or grants an upgrade, optionally only after a guardian falls. */
+  grant(back: number, what: { ability?: AbilityId; upgrade?: UpgradeId; after?: string }): this {
+    const x = this.x - back;
+    this.data.grants.push({ x, y: this.groundAt(x) - 16, ...what });
+    return this;
+  }
+
+  // ---- props -----------------------------------------------------------------------------
 
   plant(back: number, up?: number): this {
     const x = this.x - back;
@@ -246,14 +311,10 @@ export class LevelBuilder {
     return this;
   }
 
-  /** A small swarm of fireflies around a point. */
   fireflies(back: number, up: number, count = 3, spread = 26): this {
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + back * 0.37;
-      this.data.fireflies.push({
-        x: this.x - back + Math.cos(a) * spread * (0.5 + ((i * 7) % 5) / 8),
-        y: this.y - up + Math.sin(a) * spread * 0.45,
-      });
+      this.data.fireflies.push({ x: this.x - back + Math.cos(a) * spread * (0.5 + ((i * 7) % 5) / 8), y: this.y - up + Math.sin(a) * spread * 0.45 });
     }
     return this;
   }
@@ -264,9 +325,9 @@ export class LevelBuilder {
     return this;
   }
 
-  kelp(back: number, w: number, h = 70, up?: number): this {
+  kelp(back: number, w: number, h = 70): this {
     const x = this.x - back;
-    this.data.kelp.push({ x, w, y: up === undefined ? this.groundAt(x + w / 2) : this.y - up, h });
+    this.data.kelp.push({ x, w, y: this.groundAt(x + w / 2), h });
     return this;
   }
 
@@ -287,7 +348,7 @@ export class LevelBuilder {
   bloomGate(back: number, h = 70): this {
     const x = this.x - back;
     this.data.gates.push({ x, y: this.groundAt(x), h, kind: 'bloom' });
-    this.wp(x - 30, this.groundAt(x - 30) - 9, { glow: true, pause: 1.3 });
+    this.wp(x - 30, this.groundAt(x - 30) - 9, { glow: true, pause: 1.0 });
     return this;
   }
 
@@ -304,25 +365,20 @@ export class LevelBuilder {
     return this;
   }
 
-  /** Memory Shell. Ids are `<level>-<n>` in authoring order. Adds a collector-only waypoint. */
-  shell(back: number, up: number, hidden = false): this {
+  /** Memory Shell. Ids are `<level>-<n>` unless given. Adds a collector-only waypoint. */
+  shell(back: number, up: number, hidden = false, id?: string): this {
     const x = this.x - back;
     const y = this.y - up;
     this.shellCount++;
-    this.data.shells.push({ id: `${this.data.id}-${this.shellCount}`, x, y, hidden });
+    this.data.shells.push({ id: id ?? `${this.data.id}-${this.shellCount}`, x, y, hidden });
     this.data.waypoints.push({ x, y, optional: true, glow: hidden });
     return this;
   }
 
+  /** A resting light: checkpoint. */
   checkpoint(back = 0, gentleOnly = false): this {
     const x = this.x - back;
-    const y = this.groundAt(x) - 9;
-    this.data.checkpoints.push({ x, y, tideCap: 0, gentleOnly });
-    return this;
-  }
-
-  fish(kind: FishKind, back: number, up: number, back2 = back, up2 = up): this {
-    this.data.fish.push({ kind, x: this.x - back, y: this.y - up, x2: this.x - back2, y2: this.y - up2 });
+    this.data.checkpoints.push({ x, y: this.groundAt(x) - 9, tideCap: 0, gentleOnly });
     return this;
   }
 
@@ -343,7 +399,6 @@ export class LevelBuilder {
 
   kin(back: number, up: number, flee = false): this {
     this.data.kin.push({ x: this.x - back, y: this.y - up, flee });
-    this.wp(this.x - back - 40, this.groundAt(this.x - back - 40) - 9, { glow: true, pause: 0.6 });
     return this;
   }
 
@@ -354,12 +409,11 @@ export class LevelBuilder {
   }
 
   /**
-   * Derives the tide from the terrain: at the pace of an unhurried player (`pace` px/s) the water
-   * stays `m0` px below the walkable shore at the start, closing to `m1` px by the goal.
-   * Dawdle and it overtakes you; hurry and the pools ahead are still shallow.
+   * Derives the tide from the terrain: at an unhurried pace the water stays `m0` px below the
+   * walkable ground at the start, closing to `m1` px by the goal.
    */
-  autoTide(m0: number, m1: number, amp = 4, period = 7, opts: { pace?: number; breathAmp?: number; breathPeriod?: number } = {}): this {
-    this.auto = { m0, m1, amp, period, pace: opts.pace ?? 66, breathAmp: opts.breathAmp ?? 0, breathPeriod: opts.breathPeriod ?? 40 };
+  autoTide(m0: number, m1: number, amp = 4, period = 7, pace = 90): this {
+    this.auto = { m0, m1, amp, period, pace };
     return this;
   }
 
@@ -369,7 +423,6 @@ export class LevelBuilder {
     if (!a) return;
     const step = 20;
     const n = Math.ceil(d.goalX / step) + 1;
-    // The walkable shore: ground outside the stretches that are meant to hold water.
     const w: number[] = [];
     for (let i = 0; i < n; i++) {
       const x = i * step;
@@ -385,7 +438,7 @@ export class LevelBuilder {
     // The sea is level: it can only be as high as every stretch still ahead allows.
     for (let i = n - 2; i >= 0; i--) w[i] = Math.max(w[i], w[i + 1]);
     const keys: [number, number][] = [];
-    const every = Math.max(1, Math.round((a.pace * 9) / step));
+    const every = Math.max(1, Math.round((a.pace * 6) / step));
     for (let i = 0; i < n; i += every) {
       const t = Math.max(0, (i * step - d.spawn.x) / a.pace);
       if (keys.length && t <= keys[keys.length - 1][0]) continue;
@@ -393,15 +446,9 @@ export class LevelBuilder {
     }
     const endT = (d.goalX - d.spawn.x) / a.pace;
     if (endT > keys[keys.length - 1][0] + 1) keys.push([Math.round(endT), Math.round(w[n - 1])]);
-    d.tide = { keys, amp: a.amp, period: a.period, breathAmp: a.breathAmp, breathPeriod: a.breathPeriod };
+    d.tide = { keys, amp: a.amp, period: a.period };
   }
 
-  spawn(x: number, up = 9): this {
-    this.data.spawn = { x, y: this.groundAt(x) - up };
-    return this;
-  }
-
-  /** Marks the goal at the cursor. */
   goal(): this {
     this.data.goalX = this.x;
     this.goalSet = true;
@@ -413,7 +460,6 @@ export class LevelBuilder {
     if (this.inCave) throw new Error(`${d.id}: cave left open`);
     if (!this.goalSet) d.goalX = this.x;
     this.computeAutoTide();
-    // Run-out beyond the goal so the camera has somewhere to settle.
     this.point(this.x + 420, this.y);
     d.width = this.x + 400;
     if (d.ceilX.length > 0) {
@@ -440,13 +486,19 @@ export function validateLevel(d: LevelData): void {
   if (d.width < d.goalX) fail('width smaller than goal');
   if (d.tide.keys.length === 0) fail('tide has no keys');
   for (let i = 1; i < d.tide.keys.length; i++) if (d.tide.keys[i][0] <= d.tide.keys[i - 1][0]) fail('tide keys not increasing in time');
+  if (!d.twist) fail('every level needs a twist');
   const ids = new Set<string>();
   for (const s of d.shells) {
     if (ids.has(s.id)) fail(`duplicate shell ${s.id}`);
     ids.add(s.id);
   }
   for (const p of d.platforms) if (p.w <= 0) fail('platform with no width');
-  for (const all of [d.plants, d.fireflies, d.shells, d.checkpoints, d.urchins, d.geysers, d.gates, d.stones, d.kin]) {
+  for (const b of d.blocks) if (b.w <= 0 || b.h <= 0) fail('block with no size');
+  for (const e of d.enemies) {
+    if (e.x0 > e.x1) fail('enemy leash reversed');
+    if (e.arena !== undefined && !d.arenas[e.arena]) fail('enemy in a missing arena');
+  }
+  for (const all of [d.plants, d.fireflies, d.shells, d.checkpoints, d.urchins, d.geysers, d.gates, d.stones, d.kin, d.grants, d.enemies]) {
     for (const e of all) if (!Number.isFinite(e.x) || !Number.isFinite(e.y) || e.x < 0 || e.x > d.width) fail('entity out of bounds');
   }
 }

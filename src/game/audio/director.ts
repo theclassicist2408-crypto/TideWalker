@@ -18,6 +18,8 @@ export interface AudioInputs {
   paused: boolean;
   /** True on menus (title, chapter select …). */
   menu: boolean;
+  /** A guardian is being fought. */
+  boss: boolean;
 }
 
 /** Target loudness of every adaptive layer, 0..1. */
@@ -40,7 +42,7 @@ export const SILENT_MIX: AudioMix = { explore: 0, tension: 0, danger: 0, relief:
 
 /** Pure mapping from game state to layer targets. No smoothing, no Web Audio. */
 export function targetMix(i: AudioInputs, relief: number, out: AudioMix): AudioMix {
-  const sanctuary = i.biome === 'sanctuary' || i.mode === 'drift';
+  const sanctuary = i.biome === 'throne' || i.mode === 'drift';
   const calmMode = i.mode === 'drift' || i.mode === 'title' || i.menu;
   const danger = calmMode ? 0 : clamp((i.danger - 0.3) / 0.55, 0, 1);
   const lowLight = i.lumen < 0.3 ? (0.3 - i.lumen) / 0.3 : 0;
@@ -51,7 +53,8 @@ export function targetMix(i: AudioInputs, relief: number, out: AudioMix): AudioM
   out.sanctuary = sanctuary ? melodic : 0;
   out.explore = sanctuary ? melodic * 0.7 : melodic;
   out.tension = sanctuary ? tension * 0.3 : tension;
-  out.danger = danger;
+  // A guardian's presence is constant danger: its theme is the danger layer at full strength.
+  out.danger = i.boss && !calmMode ? 1 : danger;
   out.relief = relief;
   out.glowHum = clamp(i.glow, 0, 1);
   out.wind = i.submerged ? 0.05 : clamp(0.15 + i.wind * 0.6, 0, 1);

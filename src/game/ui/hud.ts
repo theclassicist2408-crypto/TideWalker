@@ -1,74 +1,114 @@
 import type { HintKind } from '../core/types';
 import { h, icon } from './dom';
 
+/** Prompt text for each lesson: [touch, keyboard]. Short on purpose. */
 const HINT_TEXT: Record<HintKind, [string, string]> = {
-  move: ['swipe', '← →'],
-  jump: ['swipe up', 'space'],
-  glow: ['hold', 'shift'],
-  pulse: ['double tap', 'E'],
-  dive: ['swipe down', '↓'],
-  hide: ['be still, be dark', 'release'],
-  dash: ['swipe again', 'Q'],
-  stop: ['tap', 'release'],
+  move: ['Stick · move', '← →'],
+  jump: ['Jump', 'Space'],
+  double: ['Jump again in the air', 'Space, twice'],
+  wall: ['Push into the wall · Jump', 'Hold toward the wall · Space'],
+  dash: ['Dash', 'C'],
+  airdash: ['Dash in the air', 'C in the air'],
+  swim: ['Stick to swim · Jump to leap out', 'Arrows · Space to leap out'],
+  dive: ['Stick down · dive', '↓ dive'],
+  glide: ['Hold Jump while falling', 'Hold Space while falling'],
+  attack: ['Strike', 'X'],
+  downstrike: ['Stick down + Strike, in the air', '↓ + X, in the air'],
+  charge: ['Hold Strike · let go', 'Hold X · let go'],
+  pulse: ['Tap Light · pulse', 'Tap V'],
+  glow: ['Hold Light · glow', 'Hold V'],
+  danger: ['Light is seen. Go dark.', 'Light is seen. Go dark.'],
+  heal: ['Hold Mend when it is safe', 'Hold H when it is safe'],
+  bench: ['Lanterns bring you back here', 'Lanterns bring you back here'],
+  pause: ['Pause · top corner', 'Esc · pause'],
+  boss: ['A guardian shows its strength', 'A guardian shows its strength'],
+  rematch: ['Fallen guardians can be fought again from the map', 'Fallen guardians can be fought again from the map'],
+  ability: ['Gift · tap its icon to switch', 'F · Q to switch'],
 };
 
+const BUTTONS: [string, string, string][] = [
+  ['jump', 'Jump', 'M12 19V6M6.5 11 12 5.500 17.500 11'],
+  ['attack', 'Strike', 'M5 19 18 6M14 5.500h4.500V10M5 14l5 5'],
+  ['dash', 'Dash', 'M5 7l5 5-5 5M12 7l5 5-5 5'],
+  ['light', 'Light', 'M12 3v3M12 18v3M3 12h3M18 12h3M12 8.500a3.500 3.500 0 1 0 0 7 3.500 3.500 0 0 0 0-7z'],
+  ['heal', 'Mend', 'M12 20s-7-4.300-7-9.500A3.800 3.800 0 0 1 12 8a3.800 3.800 0 0 1 7 2.500C19 15.700 12 20 12 20z'],
+  ['ability', 'Gift', 'M12 3l8 9-8 9-8-9z'],
+];
+
 /**
- * In-play overlay: Lumen orb, tide gauge, shell pips, pause and pulse buttons, gesture hints,
- * chapter card. Values are only written to the DOM when they change.
+ * In-play overlay: health, Lumen, Tide Essence, guardian bar, prompts, and the touch pad.
+ * Values are only written to the DOM when they change.
  */
 export class Hud {
   readonly root: HTMLElement;
-  private readonly orbRing: SVGCircleElement;
-  private readonly orb: HTMLElement;
-  private readonly tideMark: HTMLElement;
-  private readonly tideBox: HTMLElement;
+  readonly pad: HTMLElement;
+  private readonly masks: HTMLElement;
+  private readonly lumen: HTMLElement;
+  private readonly essence: HTMLElement;
   private readonly shells: HTMLElement;
-  private readonly pulseBtn: HTMLButtonElement;
-  private readonly pulseRing: SVGCircleElement;
-  private readonly pauseBtn: HTMLButtonElement;
+  private readonly boss: HTMLElement;
+  private readonly bossName: HTMLElement;
+  private readonly bossFill: HTMLElement;
+  private readonly timer: HTMLElement;
+  private readonly gift: HTMLButtonElement;
+  private readonly giftName: HTMLElement;
   private readonly hint: HTMLElement;
-  private readonly hintLabel: HTMLElement;
   private readonly card: HTMLElement;
   private readonly note: HTMLElement;
-  private readonly eye: HTMLElement;
   private readonly distance: HTMLElement;
-  private lastLumen = -1;
-  private lastTide = -1;
-  private lastPulse = -1;
+  private last = '';
+  private lastBoss = '';
   private lastHint: HintKind | null = null;
-  private lastState = '';
+  private lastTimer = -1;
+  private lastGift = '';
   private lastDistance = -1;
   private cardTimer = 0;
   private noteTimer = 0;
   onPause: (() => void) | null = null;
-  onPulse: (() => void) | null = null;
+  onCycle: (() => void) | null = null;
 
   constructor(parent: HTMLElement) {
-    const ring = (cls: string, r: number): string =>
-      `<svg viewBox="0 0 48 48" class="${cls}"><circle cx="24" cy="24" r="${r}" class="track"/><circle cx="24" cy="24" r="${r}" class="value" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0" transform="rotate(-90 24 24)"/></svg>`;
-
-    this.orb = h('div', { class: 'hud-orb', html: `${ring('orb-ring', 19)}<span class="orb-core"></span>` });
-    this.orbRing = this.orb.querySelector('.value') as SVGCircleElement;
-    this.tideMark = h('span', { class: 'tide-mark' });
-    this.tideBox = h('div', { class: 'hud-tide' }, h('span', { class: 'tide-line' }), this.tideMark, icon('tide', 14));
+    this.masks = h('div', { class: 'hud-masks', role: 'img' });
+    this.lumen = h('i');
+    this.essence = h('div', { class: 'hud-essence' });
     this.shells = h('div', { class: 'hud-shells' });
-    this.eye = h('div', { class: 'hud-eye' }, icon('eye', 20));
+    this.bossName = h('span');
+    this.bossFill = h('i');
+    this.boss = h('div', { class: 'hud-boss' }, this.bossName, h('div', { class: 'boss-bar' }, this.bossFill));
+    this.timer = h('div', { class: 'hud-timer' });
     this.distance = h('div', { class: 'hud-distance' });
-    this.pauseBtn = h('button', { class: 'hud-btn hud-pause', 'aria-label': 'Pause', onclick: () => this.onPause?.() }, icon('pause', 22));
-    this.pulseBtn = h('button', { class: 'hud-btn hud-pulse', 'aria-label': 'Lumen Pulse', html: ring('pulse-ring', 21) });
-    this.pulseBtn.append(icon('pulse', 26));
-    this.pulseRing = this.pulseBtn.querySelector('.value') as SVGCircleElement;
-    // Pointer down, not click: the pulse must fire the instant the thumb lands.
-    this.pulseBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.onPulse?.();
-    });
-    this.hintLabel = h('span', { class: 'hint-label' });
-    this.hint = h('div', { class: 'hud-hint' }, h('span', { class: 'hint-glyph' }, h('i'), h('b')), this.hintLabel);
+    this.giftName = h('span');
+    this.gift = h('button', { class: 'hud-gift', 'aria-label': 'Switch gift', onclick: () => this.onCycle?.() }, icon('pulse', 18), this.giftName);
+    const pause = h('button', { class: 'hud-btn hud-pause', 'aria-label': 'Pause', onclick: () => this.onPause?.() }, icon('pause', 22));
+    this.hint = h('div', { class: 'hud-hint' });
     this.card = h('div', { class: 'hud-card' });
     this.note = h('div', { class: 'hud-note' });
-    this.root = h('div', { class: 'hud' }, h('div', { class: 'hud-top' }, this.orb, this.tideBox, this.shells, this.eye), this.distance, this.pauseBtn, this.pulseBtn, this.hint, this.card, this.note);
+    const buttons = h('div', { class: 'pad-buttons' });
+    for (const [name, label, path] of BUTTONS) {
+      buttons.append(
+        h('button', {
+          class: `pad-btn pad-${name}`,
+          'data-btn': name,
+          'aria-label': label,
+          html: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg><span>${label}</span>`,
+        }),
+      );
+    }
+    this.pad = h('div', { class: 'pad' }, h('div', { class: 'pad-stick' }, h('div', { class: 'pad-base' }, h('div', { class: 'pad-knob' }))), buttons);
+    this.root = h(
+      'div',
+      { class: 'hud' },
+      h('div', { class: 'hud-top' }, this.masks, h('div', { class: 'hud-lumen' }, this.lumen), h('div', { class: 'hud-row' }, this.essence, this.shells)),
+      this.gift,
+      this.boss,
+      this.timer,
+      this.distance,
+      pause,
+      this.hint,
+      this.card,
+      this.note,
+      this.pad,
+    );
     parent.append(this.root);
     this.setVisible(false);
   }
@@ -81,42 +121,66 @@ export class Hud {
     this.root.classList.toggle('left-handed', handed === 'left');
   }
 
-  /** Configures which parts apply to the current mode. */
-  setMode(mode: 'story' | 'daily' | 'drift'): void {
+  setMode(mode: 'story' | 'drift'): void {
     this.root.dataset.mode = mode;
     this.distance.textContent = '';
     this.lastDistance = -1;
+    this.last = '';
   }
 
   setShells(total: number, taken: boolean[]): void {
     this.shells.replaceChildren(...Array.from({ length: total }, (_, i) => h('span', { class: `pip${taken[i] ? ' got' : ''}` }, icon('shell', 16))));
   }
 
-  /** @param lumen 0..1, @param tide 0..1, @param pulse 0..1 readiness, @param danger 0..1 */
-  update(lumen: number, tide: number, pulse: number, danger: number, fading: boolean, glowing: boolean): void {
-    const l = Math.round(lumen * 100);
-    if (l !== this.lastLumen) {
-      this.lastLumen = l;
-      this.orbRing.setAttribute('stroke-dashoffset', String(100 - l));
+  /** Health masks, Lumen bar and Essence pips. Shapes, not just colours: full, empty, filling. */
+  update(hp: number, hpMax: number, lumen: number, essence: number, essenceMax: number, healing: boolean, danger: number): void {
+    const key = `${hp}/${hpMax}/${Math.round(lumen * 40)}/${Math.floor(essence * 5)}/${essenceMax}/${healing ? 1 : 0}/${danger > 0.6 ? 1 : 0}`;
+    if (key === this.last) return;
+    this.last = key;
+    if (this.masks.childElementCount !== hpMax) this.masks.replaceChildren(...Array.from({ length: hpMax }, () => h('span', { class: 'mask' })));
+    Array.from(this.masks.children).forEach((el, i) => el.classList.toggle('full', i < hp));
+    this.masks.setAttribute('aria-label', `Health ${hp} of ${hpMax}`);
+    this.masks.classList.toggle('low', hp <= 1);
+    this.masks.classList.toggle('healing', healing);
+    this.lumen.style.transform = `scaleX(${Math.max(0, Math.min(1, lumen)).toFixed(3)})`;
+    if (this.essence.childElementCount !== essenceMax) this.essence.replaceChildren(...Array.from({ length: essenceMax }, () => h('span', { class: 'drop' }, h('i'))));
+    Array.from(this.essence.children).forEach((el, i) => {
+      const fill = Math.max(0, Math.min(1, essence - i));
+      (el.firstElementChild as HTMLElement).style.transform = `scaleY(${fill.toFixed(2)})`;
+      el.classList.toggle('full', fill >= 1);
+    });
+    this.root.classList.toggle('danger', danger > 0.6);
+  }
+
+  /** Guardian name and health; pass null to hide. */
+  setBoss(name: string | null, frac: number): void {
+    const key = name === null ? '' : `${name}:${Math.round(frac * 200)}`;
+    if (key === this.lastBoss) return;
+    this.lastBoss = key;
+    this.boss.classList.toggle('on', name !== null);
+    if (name !== null) {
+      this.bossName.textContent = name;
+      this.bossFill.style.transform = `scaleX(${Math.max(0, frac).toFixed(3)})`;
     }
-    const state = `${l < 25 ? 'low' : ''}${fading ? ' fading' : ''}${glowing ? ' glow' : ''}${danger > 0.5 ? ' danger' : ''}`;
-    if (state !== this.lastState) {
-      this.lastState = state;
-      this.orb.className = `hud-orb ${state}`;
-      this.eye.classList.toggle('on', danger > 0.5);
-    }
-    const t = Math.round(tide * 50);
-    if (t !== this.lastTide) {
-      this.lastTide = t;
-      this.tideMark.style.transform = `translateY(${-(t / 50) * 30}px)`;
-      this.tideBox.classList.toggle('high', tide > 0.75);
-    }
-    const p = Math.round(pulse * 25);
-    if (p !== this.lastPulse) {
-      this.lastPulse = p;
-      this.pulseRing.setAttribute('stroke-dashoffset', String(100 - p * 4));
-      this.pulseBtn.classList.toggle('ready', p >= 25);
-    }
+  }
+
+  setTimer(seconds: number | null): void {
+    const s = seconds === null ? -1 : Math.ceil(seconds);
+    if (s === this.lastTimer) return;
+    this.lastTimer = s;
+    this.timer.textContent = s < 0 ? '' : `${Math.floor(s / 60)}:${s % 60 < 10 ? '0' : ''}${s % 60}`;
+    this.timer.classList.toggle('low', s >= 0 && s <= 10);
+  }
+
+  /** The equipped boss gift and whether it is ready. */
+  setGift(name: string | null, ready: boolean): void {
+    const key = `${name}:${ready}`;
+    if (key === this.lastGift) return;
+    this.lastGift = key;
+    this.gift.classList.toggle('on', name !== null);
+    this.gift.classList.toggle('ready', ready);
+    this.giftName.textContent = name ?? '';
+    this.root.classList.toggle('has-gift', name !== null);
   }
 
   setDistance(metres: number): void {
@@ -126,7 +190,6 @@ export class Hud {
     this.distance.textContent = `${m} m`;
   }
 
-  /** Shows an animated gesture hint, or hides it with null. */
   setHint(kind: HintKind | null, keyboard: boolean): void {
     if (kind === this.lastHint) return;
     this.lastHint = kind;
@@ -134,25 +197,22 @@ export class Hud {
       this.hint.classList.remove('on');
       return;
     }
-    this.hint.dataset.kind = kind;
-    this.hintLabel.textContent = HINT_TEXT[kind][keyboard ? 1 : 0];
+    this.hint.textContent = HINT_TEXT[kind][keyboard ? 1 : 0];
     this.hint.classList.add('on');
   }
 
-  /** Chapter title card: fades in, lingers, fades away without blocking play. */
-  showCard(numeral: string, title: string, line: string): void {
-    this.card.replaceChildren(h('span', { class: 'card-num', text: numeral }), h('h2', { text: title }), h('p', { text: line }));
+  showCard(eyebrow: string, title: string, line: string): void {
+    this.card.replaceChildren(h('span', { class: 'card-num', text: eyebrow }), h('h2', { text: title }), h('p', { text: line }));
     this.card.classList.add('on');
     window.clearTimeout(this.cardTimer);
-    this.cardTimer = window.setTimeout(() => this.card.classList.remove('on'), 4200);
+    this.cardTimer = window.setTimeout(() => this.card.classList.remove('on'), 3200);
   }
 
-  /** A brief line of text near the bottom (shell found, lantern lit, gentler path). */
   showNote(text: string, iconName?: string): void {
     this.note.replaceChildren(...(iconName ? [icon(iconName, 18)] : []), h('span', { text }));
     this.note.classList.add('on');
     window.clearTimeout(this.noteTimer);
-    this.noteTimer = window.setTimeout(() => this.note.classList.remove('on'), 2600);
+    this.noteTimer = window.setTimeout(() => this.note.classList.remove('on'), 3000);
   }
 
   hideCard(): void {

@@ -1,31 +1,31 @@
 import { P } from '../core/constants';
 import type { Intent } from '../core/types';
-import { approach, clamp, damp, lerp, sign } from '../core/util';
+import { approach, clamp, damp, sign } from '../core/util';
 import type { World } from '../core/world';
+import { resolveSlash, tidebreakerLand, useReward } from '../systems/combat';
+import { pulseProps } from './props';
 
 const PROBE = 6;
 
-/** Creature movement: running, leaping, wading, swimming, dashing. One fixed step. */
+/** The Tideborn: running, leaping, wall work, dashing, gliding, swimming, the light-blade. One fixed step. */
 export function updatePlayer(w: World, inp: Intent, dt: number): void {
   const p = w.player;
   p.prevX = p.x;
   p.prevY = p.y;
 
   if (p.status !== 'alive') {
-    // Carried gently away; no control.
     p.statusT += dt;
-    p.vx = approach(p.vx, p.status === 'swept' ? -40 : 0, 120 * dt);
-    p.vy = approach(p.vy, 26, 200 * dt);
+    p.vx = approach(p.vx, 0, 400 * dt);
+    p.vy = approach(p.vy, 30, 300 * dt);
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.glow = approach(p.glow, 0, 2.5 * dt);
+    p.glow = approach(p.glow, 0, 3 * dt);
     return;
   }
 
-  const drift = w.mode === 'drift' || w.mode === 'title';
+  const calm = w.mode === 'drift' || w.mode === 'title';
   const waterY = w.waterY;
-  const frac = w.lumenFrac;
-  const lowScale = frac < P.lowLumen ? lerp(P.lowSpeedScale, 1, frac / P.lowLumen) : 1;
+  const crown = p.crownT > 0;
 
   p.invuln = Math.max(0, p.invuln - dt);
   p.pulseCd = Math.max(0, p.pulseCd - dt);
@@ -36,8 +36,24 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
   p.coyote = Math.max(0, p.coyote - dt);
   p.buffer = Math.max(0, p.buffer - dt);
   p.leapArm = Math.max(0, p.leapArm - dt);
+  p.lockT = Math.max(0, p.lockT - dt);
+  p.wallT = Math.max(0, p.wallT - dt);
+  p.slashCd = Math.max(0, p.slashCd - dt);
+  p.abilityCd = Math.max(0, p.abilityCd - dt);
+  p.veilT = Math.max(0, p.veilT - dt);
+  p.shield = Math.max(0, p.shield - dt);
+  p.emberT = Math.max(0, p.emberT - dt);
+  p.crownT = Math.max(0, p.crownT - dt);
+  p.hookT = Math.max(0, p.hookT - dt);
+  if (p.bloomT > 0) {
+    p.bloomT -= dt;
+    if (p.bloomT <= 0) {
+      p.hp = Math.min(w.load.hpMax, p.hp + 2);
+      w.emit('heal', p.x, p.y, 2);
+    }
+  }
 
-  // --- Medium: air/land, wading, or swimming -------------------------------------------
+  // --- Medium ---------------------------------------------------------------------------
   const groundHere = Math.min(w.ground.at(p.x - PROBE), w.ground.at(p.x + PROBE));
   const depth = groundHere - waterY;
   const wasSwim = p.swim;
@@ -45,82 +61,192 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
   p.wading = !p.swim && p.y + P.halfH > waterY + 1;
   if (p.swim && !wasSwim) {
     if (p.vy > 120) w.emit('splashIn', p.x, waterY, p.vy);
-    p.vy *= 0.4;
-    p.dashT = 0;
+    p.vy *= 0.45;
     p.jumping = false;
     p.onGround = false;
     p.onPlatform = null;
+    p.slamming = false;
+    p.jumpsLeft = 1;
+    p.airDashed = false;
   } else if (!p.swim && wasSwim && p.vy < -60) {
     w.emit('splashOut', p.x, waterY, -p.vy);
   }
 
-  // --- Glow and pulse -------------------------------------------------------------------
-  if (p.glowLocked && (p.lumen > 6 || drift)) p.glowLocked = false;
-  const want = inp.glow && !p.glowLocked && (p.lumen > 0.05 || drift);
-  if (inp.glow && !want && !p.glowLocked && !drift) p.glowLocked = true;
+  // --- Light: glow, pulse, healing, boss gift ------------------------------------------
+  const want = inp.glow && (p.lumen > 0.5 || calm);
   if (want !== p.glowOn) {
     p.glowOn = want;
     w.emit(want ? 'glowOn' : 'glowOff', p.x, p.y, 0);
   }
-  p.glow = approach(p.glow, want ? 1 : 0, dt * (want ? 5.5 : 3.2));
+  p.glow = approach(p.glow, want ? 1 : 0, dt * (want ? 6 : 3.5));
+  const lumenBefore = p.lumen;
+  if (!calm) {
+    if (want) p.lumen = Math.max(0, p.lumen - P.glowDrain * dt);
+    else p.lumen = Math.min(w.load.lumenMax, p.lumen + P.lumenRegen * (p.inPool || p.inSafe ? 5 : 1) * dt);
+    const low = w.load.lumenMax * 0.2;
+    if (lumenBefore >= low && p.lumen < low) w.emit('lowLumen', p.x, p.y, 0);
+  } else {
+    p.lumen = w.load.lumenMax;
+  }
 
   if (inp.pulse) {
-    if (p.pulseCd <= 0 && (drift || p.lumen >= P.pulseCost * 0.5)) {
-      if (!drift) p.lumen = Math.max(0, p.lumen - P.pulseCost);
+    if (w.has('pulse') && p.pulseCd <= 0 && (calm || p.lumen >= P.pulseCost)) {
+      if (!calm) p.lumen -= P.pulseCost;
       p.pulseCd = P.pulseCooldown;
       p.pulseFlash = P.pulseReveal;
-      w.emit('pulse', p.x, p.y, 0);
-      w.pulse(p.x, p.y);
+      p.invuln = Math.max(p.invuln, P.pulseSafe);
+      w.emit('pulse', p.x, p.y, w.load.pulseLevel);
+      pulseProps(w, p.x, p.y);
     } else {
       w.emit('pulseFail', p.x, p.y, 0);
     }
   }
 
-  if (Math.abs(inp.mx) > 0.1) p.facing = sign(inp.mx);
-
-  // --- Dash (slide on land, burst in water) ---------------------------------------------
-  if (inp.dash && p.dashCd <= 0 && (p.swim || p.onGround || !p.airDashed)) {
-    p.dashDir = Math.abs(inp.mx) > 0.1 ? sign(inp.mx) : p.facing;
-    p.dashT = P.dashTime;
-    p.dashCd = P.dashCooldown;
-    if (!p.swim && !p.onGround) {
-      p.airDashed = true;
-      if (p.vy > 0) p.vy *= 0.35;
+  // Healing roots the creature in place: safety has to be made first.
+  const canHeal = inp.heal && (p.onGround || p.swim) && p.essence >= 1 && p.hp < w.load.hpMax && !w.level.rules.noHeal && p.slashT <= 0 && p.dashT <= 0;
+  if (canHeal) {
+    if (p.healT === 0) w.emit('healStart', p.x, p.y, 0);
+    p.healT += dt;
+    if (p.healT >= P.healTime) {
+      p.healT = 0;
+      p.essence -= 1;
+      p.hp = Math.min(w.load.hpMax, p.hp + w.diff.healAmount);
+      w.emit('heal', p.x, p.y, w.diff.healAmount);
     }
+  } else {
+    p.healT = 0;
+  }
+  const rooted = p.healT > 0;
+
+  if (inp.ability && !rooted) useReward(w);
+
+  if (p.lockT <= 0 && Math.abs(inp.mx) > 0.2 && p.dashT <= 0 && p.slashT <= 0) p.facing = sign(inp.mx);
+
+  // --- Light-blade ----------------------------------------------------------------------
+  if (inp.attack && p.slashCd <= 0 && !rooted) {
+    p.slashDir = inp.my < -0.5 ? 'up' : inp.my > 0.5 && !p.onGround && !p.swim ? 'down' : 'side';
+    p.slashT = P.slashTime;
+    p.slashCd = P.slashCooldown * (crown ? 0.7 : 1);
+    p.slashId = w.nextSlashId();
+    p.charged = false;
+    w.emit('slash', p.x, p.y, p.slashDir === 'up' ? 1 : p.slashDir === 'down' ? 2 : 0);
+  }
+  if (w.has('charge') && inp.attackHeld && !rooted) {
+    const before = p.chargeT;
+    p.chargeT += dt;
+    if (before < P.chargeTime && p.chargeT >= P.chargeTime) w.emit('chargeReady', p.x, p.y, 0);
+  } else {
+    if (p.chargeT >= P.chargeTime && !rooted && (calm || p.lumen >= P.chargeCost)) {
+      if (!calm) p.lumen -= P.chargeCost;
+      p.slashDir = 'side';
+      p.slashT = P.slashTime * 1.4;
+      p.slashCd = P.slashCooldown * 1.5;
+      p.slashId = w.nextSlashId();
+      p.charged = true;
+      w.emit('chargeSlash', p.x, p.y, p.facing);
+    }
+    p.chargeT = 0;
+  }
+  if (p.slashT > 0) {
+    p.slashT -= dt;
+    resolveSlash(w);
+  }
+
+  // --- Dash -----------------------------------------------------------------------------
+  if (inp.dash && w.has('dash') && p.dashCd <= 0 && !rooted && (p.swim || p.onGround || (w.has('airdash') && !p.airDashed))) {
+    p.dashDir = Math.abs(inp.mx) > 0.2 ? sign(inp.mx) : p.sliding ? -p.wallDir : p.facing;
+    p.facing = p.dashDir;
+    p.dashT = P.dashTime;
+    p.dashCd = P.dashCooldown * (crown ? 0.6 : 1);
+    if (!p.swim && !p.onGround) p.airDashed = true;
+    p.jumping = false;
+    p.slamming = false;
     w.emit('dash', p.x, p.y, p.dashDir);
   }
 
-  if (p.swim) swimStep(w, inp, dt, lowScale);
-  else landStep(w, inp, dt, lowScale);
+  if (p.hookT > 0) {
+    // Vinehook: reeled straight to the anchor.
+    const dx = p.hookX - p.x;
+    const dy = p.hookY - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    p.vx = (dx / d) * 640;
+    p.vy = (dy / d) * 640;
+    if (d < 22) {
+      p.hookT = 0;
+      p.vx *= 0.25;
+      p.vy = Math.min(p.vy * 0.25, -120);
+      p.jumpsLeft = 1;
+      p.airDashed = false;
+    }
+  } else if (p.swim) swimStep(w, inp, dt, rooted);
+  else landStep(w, inp, dt, rooted);
 
   applyCurrents(w, dt);
   integrate(w, dt);
 }
 
-function landStep(w: World, inp: Intent, dt: number, lowScale: number): void {
+function landStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
   const p = w.player;
-  p.crouch = inp.down && p.onGround && Math.abs(inp.mx) < 0.1;
-  const scale = lowScale * (p.wading ? P.wadeScale : 1);
-  const target = p.crouch ? 0 : inp.mx * P.runSpeed * scale;
+  const crown = p.crownT > 0;
+  const steer = p.lockT > 0 || rooted ? 0 : inp.mx;
+  const target = rooted ? 0 : steer * P.runSpeed * (p.wading ? 0.85 : 1) * (crown ? 1.18 : 1);
 
   if (p.dashT > 0) {
-    p.vx = p.dashDir * P.dashSpeed * (0.62 + 0.38 * (p.dashT / P.dashTime));
-  } else {
+    p.vx = p.dashDir * P.dashSpeed;
+    p.vy = 0;
+  } else if (p.lockT <= 0 || rooted) {
     const speeding = Math.abs(target) > Math.abs(p.vx) || target * p.vx < 0;
-    const rate = p.onGround ? (speeding ? P.accel : P.friction) : P.airAccel;
+    // In the air, speed carried out of a dash bleeds off slowly: a dash-leap covers real distance.
+    const carried = !p.onGround && !speeding && target !== 0;
+    const rate = p.onGround ? (speeding ? P.accel : P.friction) : carried ? 520 : P.airAccel;
     p.vx = approach(p.vx, target, rate * dt);
   }
 
+  // Wall: slide when pressing into it, hang for a moment first.
+  const onWall = w.has('wall') && !p.onGround && p.wallT > 0;
+  p.sliding = onWall && p.vy >= 0 && inp.mx * p.wallDir > 0.2 && p.dashT <= 0;
+  if (p.sliding) {
+    p.clingT += dt;
+    const cap = p.clingT < 1.1 ? 0 : P.wallSlide;
+    if (p.vy > cap) p.vy = cap;
+    p.airDashed = false;
+  }
+
   if (inp.jump) p.buffer = P.buffer;
-  if (p.onGround) p.coyote = P.coyote;
-  if (p.buffer > 0 && p.coyote > 0) {
-    p.vy = -P.jumpVel;
-    p.onGround = false;
-    p.onPlatform = null;
-    p.coyote = 0;
-    p.buffer = 0;
-    p.jumping = true;
-    w.emit('jump', p.x, p.y + P.halfH, 0);
+  if (p.onGround) {
+    p.coyote = P.coyote;
+    p.jumpsLeft = 1;
+    p.clingT = 0;
+  }
+  if (p.buffer > 0 && !rooted) {
+    if (p.coyote > 0) {
+      p.dashT = 0;
+      p.vy = -P.jumpVel;
+      p.onGround = false;
+      p.onPlatform = null;
+      p.coyote = 0;
+      p.buffer = 0;
+      p.jumping = true;
+      w.emit('jump', p.x, p.y + P.halfH, 0);
+    } else if (onWall) {
+      p.vx = -p.wallDir * P.wallJumpX;
+      p.vy = -P.wallJumpY;
+      p.facing = -p.wallDir;
+      p.lockT = P.wallLock;
+      p.wallT = 0;
+      p.buffer = 0;
+      p.jumping = true;
+      p.jumpsLeft = 1;
+      p.airDashed = false;
+      p.sliding = false;
+      w.emit('wallJump', p.x + p.wallDir * P.halfW, p.y, -p.wallDir);
+    } else if (w.has('double') && p.jumpsLeft > 0) {
+      p.vy = -P.doubleVel;
+      p.jumpsLeft = 0;
+      p.buffer = 0;
+      p.jumping = true;
+      w.emit('doubleJump', p.x, p.y + P.halfH, 0);
+    }
   }
   if (p.jumping) {
     if (p.vy >= 0) p.jumping = false;
@@ -130,50 +256,61 @@ function landStep(w: World, inp: Intent, dt: number, lowScale: number): void {
     }
   }
 
-  if (inp.down && p.onGround && p.onPlatform) {
+  if (inp.my > 0.5 && p.onGround && p.onPlatform) {
     p.dropT = 0.25;
     p.onGround = false;
     p.onPlatform = null;
   }
 
-  const fastFall = inp.down && !p.onGround && p.vy > -80;
-  p.vy = Math.min(P.maxFall, p.vy + P.gravity * (fastFall ? 1.7 : 1) * dt);
+  if (p.dashT <= 0) {
+    const g = P.gravity * (w.level.rules.gravity ?? 1);
+    p.vy = Math.min(p.slamming ? 1100 : P.maxFall, p.vy + g * dt);
+    // Glide: a held jump while falling spreads the fins.
+    p.gliding = w.has('glide') && inp.jumpHeld && !p.onGround && !p.sliding && !p.slamming && p.vy > P.glideFall && p.jumpsLeft === 0;
+    if (p.gliding) p.vy = approach(p.vy, P.glideFall, 2600 * dt);
+    const wind = w.level.rules.wind ?? 0;
+    if (wind !== 0 && !p.onGround) p.vx += wind * dt;
+  } else {
+    p.gliding = false;
+  }
 }
 
-function swimStep(w: World, inp: Intent, dt: number, lowScale: number): void {
+function swimStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
   const p = w.player;
-  p.crouch = false;
-  let ix = inp.mx;
-  let iy = inp.my;
+  p.sliding = false;
+  p.gliding = false;
+  let ix = rooted ? 0 : inp.mx;
+  let iy = rooted ? 0 : inp.my;
+  // Without the dive, the creature can only paddle along the surface.
+  if (!w.has('dive') && iy > 0) iy = 0;
   const len = Math.hypot(ix, iy);
   if (len > 1) {
     ix /= len;
     iy /= len;
   }
-  const speed = P.swimSpeed * lowScale;
+  const speed = P.swimSpeed * (p.crownT > 0 ? 1.15 : 1);
   const atSurface = p.y <= w.waterY + 3;
   let tvx = ix * speed;
   let tvy = iy * speed;
-  // Without vertical steering the creature drifts up and rests at the surface.
-  if (Math.abs(iy) < 0.1) tvy = atSurface ? 0 : -P.buoyancy;
+  if (Math.abs(iy) < 0.1) tvy = atSurface ? 0 : -P.buoyancy * (w.has('dive') ? 1 : 4);
   if (p.dashT > 0) {
-    const boost = 1 + 1.25 * (p.dashT / P.dashTime);
-    tvx = (Math.abs(ix) > 0.1 || Math.abs(iy) > 0.1 ? ix : p.dashDir) * speed * boost;
-    tvy *= boost;
+    const dx = Math.abs(ix) > 0.1 || Math.abs(iy) > 0.1 ? ix : p.dashDir;
+    tvx = dx * P.dashSpeed * 0.8;
+    tvy = iy * P.dashSpeed * 0.8;
   }
-  const k = damp(P.swimRate, dt);
+  const k = damp(p.dashT > 0 ? 30 : P.swimRate, dt);
   p.vx += (tvx - p.vx) * k;
   p.vy += (tvy - p.vy) * k;
 
   if (inp.jump) p.leapArm = P.leapArm;
   if (p.y <= w.waterY + 1.5 && p.vy <= 0) {
-    if (p.leapArm > 0) {
-      // Breach: leave the water in a clean arc.
+    if (p.leapArm > 0 && !rooted) {
       p.vy = -P.leapVel;
-      p.vx += ix * 36;
+      p.vx += ix * 40;
       p.leapArm = 0;
       p.swim = false;
       p.jumping = false;
+      p.jumpsLeft = 1;
       p.airDashed = false;
       w.emit('splashOut', p.x, w.waterY, P.leapVel);
     } else {
@@ -212,22 +349,32 @@ function integrate(w: World, dt: number): void {
   const p = w.player;
   const ground = w.ground;
   const ceil = w.ceil;
+  const feet0 = p.y + P.halfH;
+  const head0 = p.y - P.halfH;
 
-  // Horizontal move, blocked by walls, low ceilings and closed gates.
+  // Horizontal: terrain walls, cave lips, blocks and closed gates stop the creature.
   let nx = clamp(p.x + p.vx * dt, w.minX, w.level.width - 10);
   const dx = nx - p.x;
+  let touched = 0;
   if (dx !== 0) {
     const dir = dx > 0 ? 1 : -1;
     const lead = nx + dir * P.halfW;
     const allow = P.stepUp + Math.abs(dx) * 1.6;
-    const feet = p.y + P.halfH;
-    const head = p.y - P.halfH;
-    let blocked = ground.at(lead) < feet - allow || ceil.at(lead) > head + allow;
+    let blocked = ground.at(lead) < feet0 - allow || ceil.at(lead) > head0 + allow;
+    if (!blocked) {
+      for (let i = 0; i < w.blocks.length; i++) {
+        const b = w.blocks[i];
+        if (b.broken || feet0 <= b.y + 2 || head0 >= b.y + b.h - 2) continue;
+        if (lead > b.x && lead < b.x + b.w) {
+          blocked = true;
+          break;
+        }
+      }
+    }
     if (!blocked) {
       for (let i = 0; i < w.gates.length; i++) {
         const g = w.gates[i];
-        if (g.open) continue;
-        if (feet < g.y - g.h || head > g.y) continue;
+        if (g.open || feet0 < g.y - g.h || head0 > g.y) continue;
         const from = p.x + dir * P.halfW;
         if ((dir > 0 && from <= g.x - 5 && lead > g.x - 5) || (dir < 0 && from >= g.x + 5 && lead < g.x + 5)) {
           blocked = true;
@@ -237,14 +384,19 @@ function integrate(w: World, dt: number): void {
     }
     if (blocked) {
       nx = p.x;
+      touched = dir;
       p.vx = 0;
-      p.dashT = 0;
+      if (p.dashT > 0) p.dashT = 0;
+      if (p.hookT > 0) p.hookT = 0;
     }
   }
   p.x = nx;
+  if (touched !== 0 && !p.onGround) {
+    p.wallDir = touched;
+    p.wallT = P.wallGrace;
+  }
 
-  // Vertical move against ground, platforms and ceiling.
-  const prevFeet = p.y + P.halfH;
+  // Vertical: ground, platforms, block tops and undersides, cave roof.
   let ny = p.y + p.vy * dt;
   const g = Math.min(ground.at(p.x - PROBE), ground.at(p.x + PROBE));
   const wasOnGround = p.onGround;
@@ -259,10 +411,23 @@ function integrate(w: World, dt: number): void {
       p.onGround = !p.swim;
     }
   } else if (wasOnGround && !p.swim && p.vy >= 0 && !p.jumping && g - (ny + P.halfH) < 9) {
-    // Stay glued to gentle downward slopes instead of micro-falling.
     ny = g - P.halfH;
     p.vy = 0;
     p.onGround = true;
+  }
+
+  for (let i = 0; i < w.blocks.length; i++) {
+    const b = w.blocks[i];
+    if (b.broken || p.x + PROBE <= b.x || p.x - PROBE >= b.x + b.w) continue;
+    if (p.vy >= 0 && feet0 <= b.y + 4 && ny + P.halfH >= b.y) {
+      ny = b.y - P.halfH;
+      p.vy = 0;
+      p.onGround = !p.swim;
+    } else if (p.vy < 0 && head0 >= b.y + b.h - 4 && ny - P.halfH <= b.y + b.h) {
+      ny = b.y + b.h + P.halfH;
+      p.vy = 0;
+      p.jumping = false;
+    }
   }
 
   if (!p.onGround && !p.swim && p.dropT <= 0 && p.vy >= 0) {
@@ -270,17 +435,18 @@ function integrate(w: World, dt: number): void {
       const pl = w.platforms[i];
       if (!pl.solid) continue;
       if (p.x < pl.x - PROBE || p.x > pl.x + pl.w + PROBE) continue;
-      if (prevFeet <= pl.y + 3 && ny + P.halfH >= pl.y) {
+      if (feet0 <= pl.y + 3 + Math.abs(pl.mvy) * dt * 2 && ny + P.halfH >= pl.y) {
         ny = pl.y - P.halfH;
         p.vy = 0;
         p.onGround = true;
         onPlatform = pl;
-        if (pl.kind === 'crumble' && pl.timer < 0) pl.timer = 0.6;
+        if (pl.kind === 'crumble' && pl.timer < 0) pl.timer = 0.45;
         break;
       }
     }
   }
   p.onPlatform = onPlatform;
+  if (onPlatform) p.x += onPlatform.mvx * dt;
 
   const c = Math.max(ceil.at(p.x - PROBE), ceil.at(p.x + PROBE));
   if (ny - P.halfH < c) {
@@ -291,6 +457,15 @@ function integrate(w: World, dt: number): void {
 
   if (p.onGround) {
     p.airDashed = false;
-    if (!wasOnGround && impact > 140) w.emit('land', p.x, p.y + P.halfH, impact);
+    p.gliding = false;
+    if (!wasOnGround) {
+      if (p.slamming) tidebreakerLand(w);
+      else if (impact > 160) w.emit('land', p.x, p.y + P.halfH, impact);
+    }
+    p.slamming = false;
+    if (!onPlatform || onPlatform.kind === 'rock') {
+      p.safeX = p.x;
+      p.safeY = p.y;
+    }
   }
 }

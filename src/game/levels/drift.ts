@@ -2,7 +2,7 @@ import type { BiomeId, LevelData } from '../core/types';
 import { makeRng } from '../core/util';
 import { LevelBuilder } from './builder';
 
-const DRIFT_BIOMES: BiomeId[] = ['pools', 'sanctuary', 'kelp', 'ruins'];
+const DRIFT_BIOMES: BiomeId[] = ['pools', 'throne', 'kelp', 'coral', 'gardens'];
 export const DRIFT_LENGTH = 26000;
 
 /**
@@ -14,11 +14,12 @@ export function makeDriftLevel(seed: number): LevelData {
   const biome = DRIFT_BIOMES[seed % DRIFT_BIOMES.length];
   const b = new LevelBuilder({
     id: `drift-${seed}`,
+    area: 0,
     index: 0,
     name: 'Drift',
     line: 'Nowhere to be.',
     biome,
-    teaches: 'Peace',
+    twist: 'Nothing hunts here',
     weather: { rain: 0, wind: 0.15, lightning: false, fog: 0.2, moon: 0.6 + rng() * 0.4, fireflies: 0.9 },
   });
   b.tide([[0, 58]], 7, 15);
@@ -62,6 +63,12 @@ export function makeDriftLevel(seed: number): LevelData {
       b.fireflies(60, 30 + rng() * 30, 3);
     }
     if (rng() < 0.25) b.kin(60, 26 + rng() * 20);
+    if (rng() < 0.2) {
+      // A wall to kick up, for the joy of it.
+      b.flat(80);
+      b.step(-150, 'climb');
+      b.flat(120);
+    }
   }
   b.flat(400).goal();
   return b.build();
@@ -71,11 +78,12 @@ export function makeDriftLevel(seed: number): LevelData {
 export function titleLevel(): LevelData {
   const b = new LevelBuilder({
     id: 'title',
+    area: 0,
     index: 0,
     name: 'Tidewalker',
     line: '',
     biome: 'pools',
-    teaches: '',
+    twist: 'Title',
     weather: { rain: 0, wind: 0.2, lightning: false, fog: 0.25, moon: 1, fireflies: 0.9 },
   });
   b.tide([[0, 30]], 4, 9);

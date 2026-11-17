@@ -473,23 +473,98 @@ export class AudioEngine {
       case 'dash':
         this.burst({ dur: 0.2, freq: 700, to: 2600, gain: 0.12, pan });
         break;
-      case 'sting':
-        this.tone({ freq: 330, to: 200, dur: 0.18, gain: 0.1, type: 'square', cutoff: 1400 });
-        this.tone({ freq: 349, to: 211, dur: 0.18, gain: 0.08, type: 'square', cutoff: 1400 });
+      case 'slash':
+        this.burst({ dur: 0.09, freq: 2600, to: 900, gain: 0.09, pan });
         break;
-      case 'bite':
-        this.tone({ freq: 110, to: 46, dur: 0.45, gain: 0.3, type: 'sawtooth', cutoff: 500 });
-        this.burst({ dur: 0.3, freq: 420, to: 120, gain: 0.2 });
+      case 'chargeReady':
+        this.tone({ freq: 660, to: 990, dur: 0.16, gain: 0.07, wet: 0.4 });
         break;
-      case 'caught':
-      case 'swept':
-        this.tone({ freq: 392, to: 98, dur: 1.5, gain: 0.14, wet: 0.8 });
-        this.burst({ dur: 1.4, freq: 600, to: 120, filter: 'lowpass', gain: 0.16, wet: 0.5 });
+      case 'chargeSlash':
+        this.burst({ dur: 0.22, freq: 1800, to: 400, gain: 0.2, wet: 0.3 });
+        this.tone({ freq: 330, to: 110, dur: 0.25, gain: 0.14 });
         break;
-      case 'fading':
+      case 'hit':
+        this.burst({ dur: 0.07, freq: 1200, q: 2, gain: 0.16 * n, pan });
+        this.tone({ freq: 220, to: 130, dur: 0.08, gain: 0.1 * n, type: 'square', cutoff: 1200, pan });
+        break;
+      case 'clang':
+        this.tone({ freq: 1400, to: 1100, dur: 0.18, gain: 0.1 * n, type: 'triangle', pan, wet: 0.4 });
+        break;
+      case 'pogo':
+      case 'doubleJump':
+      case 'wallJump':
+        this.tone({ freq: 440, to: 720, dur: 0.1, gain: 0.07, pan });
+        break;
+      case 'kill':
+        this.burst({ dur: 0.3, freq: 700, to: 150, gain: 0.2 * n, pan, wet: 0.3 });
+        this.tone({ freq: this.scaleHz(4, 3), dur: 0.3, gain: 0.05, wet: 0.6, pan });
+        break;
+      case 'hurt':
+        this.tone({ freq: 160, to: 60, dur: 0.35, gain: 0.3, type: 'sawtooth', cutoff: 600 });
+        this.burst({ dur: 0.25, freq: 500, to: 140, gain: 0.2 });
+        break;
+      case 'death':
+        this.tone({ freq: 392, to: 82, dur: 1.2, gain: 0.16, wet: 0.8 });
+        this.burst({ dur: 1.0, freq: 600, to: 120, filter: 'lowpass', gain: 0.18, wet: 0.5 });
+        break;
+      case 'healStart':
+        this.tone({ freq: 294, to: 440, dur: 0.9, gain: 0.05, attack: 0.5, wet: 0.5 });
+        break;
+      case 'heal':
+        [0, 2, 4].forEach((d, i) => this.bell(this.scaleHz(d, 3), i * 0.07, 0.08, this.sfxBus));
+        break;
+      case 'grant':
+        [0, 2, 4, 7, 9].forEach((d, i) => this.bell(this.scaleHz(d, 2), i * 0.14, 0.11, this.sfxBus));
+        break;
+      case 'ability':
+        this.tone({ freq: 300, to: 900, dur: 0.22, gain: 0.1, wet: 0.5 });
+        break;
+      case 'abilityFail':
+        this.tone({ freq: 170, to: 130, dur: 0.12, gain: 0.07, type: 'triangle' });
+        break;
+      case 'break':
+        this.burst({ dur: 0.5, freq: 300, to: 90, filter: 'lowpass', gain: 0.3 * n, pan });
+        break;
       case 'lowLumen':
+      case 'timeLow':
         this.tone({ freq: 494, to: 440, dur: 0.3, gain: 0.07, wet: 0.5 });
         this.tone({ freq: 370, to: 330, dur: 0.4, gain: 0.07, delay: 0.25, wet: 0.5 });
+        break;
+      case 'enemyWindup':
+        // Each attack is heard coming: a rising growl, deeper for guardians.
+        this.tone({ freq: v > 0 ? 50 : 90, to: v > 0 ? 130 : 210, dur: 0.4, gain: (v > 0 ? 0.26 : 0.16) * n, type: 'sawtooth', cutoff: 520, attack: 0.15, pan });
+        break;
+      case 'enemyAttack':
+        this.burst({ dur: 0.22, freq: 400, to: 1600, gain: 0.14 * n, pan });
+        break;
+      case 'shot':
+        this.tone({ freq: 520, to: 260, dur: 0.14, gain: 0.08 * n, type: 'triangle', pan });
+        break;
+      case 'zoneWarn':
+        this.tone({ freq: 880, to: 660, dur: 0.12, gain: 0.04 * n, pan });
+        break;
+      case 'zoneHit':
+        this.burst({ dur: 0.25, freq: 900, to: 200, gain: 0.16 * n, pan });
+        break;
+      case 'spawn':
+        this.tone({ freq: 120, to: 240, dur: 0.3, gain: 0.1 * n, type: 'triangle', pan, wet: 0.4 });
+        break;
+      case 'bossIntro':
+      case 'bossPhase':
+        this.tone({ freq: 55, to: 36, dur: 1.6, gain: 0.4, type: 'sawtooth', cutoff: 300, wet: 0.7 });
+        this.burst({ dur: 1.4, freq: 200, to: 60, filter: 'lowpass', gain: 0.3, wet: 0.6 });
+        break;
+      case 'bossDown':
+      case 'minibossDown':
+        this.burst({ dur: 1.6, freq: 800, to: 80, filter: 'lowpass', gain: 0.3, wet: 0.7 });
+        [0, 2, 4, 7, 9, 11].forEach((d, i) => this.bell(this.scaleHz(d, 2), 0.3 + i * 0.16, 0.11, this.sfxBus));
+        break;
+      case 'arenaStart':
+      case 'gateClose':
+        this.tone({ freq: 110, to: 70, dur: 0.4, gain: 0.2 * n, type: 'triangle', pan });
+        break;
+      case 'arenaClear':
+        [0, 4, 7].forEach((d, i) => this.bell(this.scaleHz(d, 2), i * 0.12, 0.09, this.sfxBus));
         break;
       case 'pickup':
         this.tone({ freq: this.scaleHz(4 + Math.floor(Math.random() * 3), 3), dur: 0.25, gain: 0.07, wet: 0.5, pan });
@@ -526,22 +601,6 @@ export class AudioEngine {
         break;
       case 'geyser':
         this.burst({ dur: 1, freq: 1800, to: 600, filter: 'highpass', gain: 0.16 * n, attack: 0.05, pan, wet: 0.3 });
-        break;
-      case 'fishAlert':
-        this.tone({ freq: 74, to: 55, dur: 0.6, gain: 0.26 * n, type: 'triangle', pan, wet: 0.5 });
-        break;
-      case 'fishWindup':
-        this.tone({ freq: 60, to: 150, dur: 0.5, gain: 0.26 * n, type: 'sawtooth', cutoff: 420, attack: 0.2, pan });
-        break;
-      case 'fishLunge':
-        this.burst({ dur: 0.35, freq: 300, to: 1500, gain: 0.18 * n, pan });
-        break;
-      case 'fishRipple':
-        this.tone({ freq: v > 1 ? 82 : 520, to: v > 1 ? 61 : 300, dur: v > 1 ? 0.7 : 0.12, gain: (v > 1 ? 0.16 : 0.03) * n, pan, wet: 0.5 });
-        break;
-      case 'nearMiss':
-        this.burst({ dur: 0.25, freq: 2400, to: 700, gain: 0.1, wet: 0.4 });
-        this.tone({ freq: 880, to: 1320, dur: 0.2, gain: 0.05, wet: 0.6 });
         break;
       case 'stoneWarn':
         this.burst({ dur: 0.07, freq: 2600, q: 3, gain: 0.12 * n, pan });

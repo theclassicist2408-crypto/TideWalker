@@ -1,5 +1,5 @@
-import { SAVE_KEY, TOTAL_CHAPTERS } from '../core/constants';
-import type { Difficulty, HintKind } from '../core/types';
+import { ALL_ABILITIES, ALL_REWARDS, AREA_COUNT, BASE_ESSENCE, BASE_HP, BASE_LUMEN, LEVELS_PER_AREA, SAVE_KEY } from '../core/constants';
+import type { AbilityId, Difficulty, HintKind, Loadout, RewardId, UpgradeId } from '../core/types';
 
 export interface Settings {
   master: number;
@@ -8,7 +8,6 @@ export interface Settings {
   haptics: boolean;
   reducedMotion: boolean;
   screenShake: boolean;
-  /** Show on-screen indicators for sounds that warn of danger. */
   visualCues: boolean;
   textScale: number;
   handed: 'right' | 'left';
@@ -16,29 +15,31 @@ export interface Settings {
   batterySaver: boolean;
 }
 
-export interface ChapterRecord {
-  completed: boolean;
+export interface LevelRecord {
+  done: boolean;
   bestTime: number | null;
-  routes: string[];
-}
-
-export interface CheckpointRecord {
-  chapter: number;
-  index: number;
 }
 
 export interface SaveData {
-  version: 1;
-  /** Highest chapter unlocked (1-based). */
-  currentChapter: number;
-  chapters: Record<string, ChapterRecord>;
-  /** Ids of every Memory Shell collected. */
+  version: 2;
+  tutorialDone: boolean;
+  /** How many story levels are open (1 = only 1-1; 100 = all). */
+  unlocked: number;
+  levels: Record<string, LevelRecord>;
+  abilities: AbilityId[];
+  rewards: RewardId[];
+  equipped: RewardId | null;
+  upgrades: Record<UpgradeId, number>;
+  /** Shrine ids (`level:index`) already taken. */
+  grants: string[];
+  /** Bosses and minibosses beaten. */
+  defeated: string[];
   shells: string[];
+  secrets: string[];
   settings: Settings;
-  daily: { lastCompleted: string | null; streak: number; bestTimes: Record<string, number> };
   driftBest: number;
-  checkpoint: CheckpointRecord | null;
-  tutorial: Partial<Record<HintKind, boolean>>;
+  checkpoint: { level: string; index: number } | null;
+  hints: Partial<Record<HintKind, boolean>>;
   endingSeen: boolean;
 }
 
@@ -62,43 +63,59 @@ export const DEFAULT_SETTINGS: Settings = {
   batterySaver: false,
 };
 
+export const TOTAL = AREA_COUNT * LEVELS_PER_AREA;
+
 export function defaultSave(): SaveData {
   return {
-    version: 1,
-    currentChapter: 1,
-    chapters: {},
+    version: 2,
+    tutorialDone: false,
+    unlocked: 1,
+    levels: {},
+    abilities: [],
+    rewards: [],
+    equipped: null,
+    upgrades: { health: 0, lumen: 0, essence: 0, pulse: 0 },
+    grants: [],
+    defeated: [],
     shells: [],
+    secrets: [],
     settings: { ...DEFAULT_SETTINGS },
-    daily: { lastCompleted: null, streak: 0, bestTimes: {} },
     driftBest: 0,
     checkpoint: null,
-    tutorial: {},
+    hints: {},
     endingSeen: false,
   };
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const num = (v: unknown, fallback: number, lo: number, hi: number): number =>
-  typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
+const num = (v: unknown, fallback: number, lo: number, hi: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback);
 const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback);
-const strings = (v: unknown): string[] => (Array.isArray(v) ? [...new Set(v.filter((s): s is string => typeof s === 'string' && s.length < 64))] : []);
+const strings = (v: unknown, max = 400): string[] => (Array.isArray(v) ? [...new Set(v.filter((s): s is string => typeof s === 'string' && s.length < 64))].slice(0, max) : []);
 
-/** Rebuilds a valid save from anything: wrong types, missing keys and junk are replaced by defaults. */
+/** Rebuilds a valid save from anything: wrong types, missing keys and junk become defaults. */
 export function sanitize(raw: unknown): SaveData {
   const d = defaultSave();
   if (!isObj(raw)) return d;
-  d.currentChapter = Math.round(num(raw.currentChapter, 1, 1, TOTAL_CHAPTERS));
+  d.tutorialDone = bool(raw.tutorialDone, false);
+  d.unlocked = Math.round(num(raw.unlocked, 1, 1, TOTAL));
+  d.abilities = strings(raw.abilities).filter((a): a is AbilityId => (ALL_ABILITIES as string[]).includes(a));
+  d.rewards = strings(raw.rewards).filter((a): a is RewardId => (ALL_REWARDS as string[]).includes(a));
+  d.equipped = typeof raw.equipped === 'string' && d.rewards.includes(raw.equipped as RewardId) ? (raw.equipped as RewardId) : (d.rewards[d.rewards.length - 1] ?? null);
+  d.grants = strings(raw.grants);
+  d.defeated = strings(raw.defeated);
   d.shells = strings(raw.shells);
+  d.secrets = strings(raw.secrets);
   d.driftBest = num(raw.driftBest, 0, 0, 1e9);
   d.endingSeen = bool(raw.endingSeen, false);
-
-  if (isObj(raw.chapters)) {
-    for (const key of Object.keys(raw.chapters)) {
-      const c = raw.chapters[key];
-      const n = Number(key);
-      if (!isObj(c) || !Number.isInteger(n) || n < 1 || n > TOTAL_CHAPTERS) continue;
+  if (isObj(raw.upgrades)) {
+    d.upgrades = { health: Math.round(num(raw.upgrades.health, 0, 0, 6)), lumen: Math.round(num(raw.upgrades.lumen, 0, 0, 6)), essence: Math.round(num(raw.upgrades.essence, 0, 0, 6)), pulse: Math.round(num(raw.upgrades.pulse, 0, 0, 3)) };
+  }
+  if (isObj(raw.levels)) {
+    for (const key of Object.keys(raw.levels).slice(0, 200)) {
+      const c = raw.levels[key];
+      if (!isObj(c) || !/^a\d{2}-\d{2}$/.test(key)) continue;
       const best = typeof c.bestTime === 'number' && Number.isFinite(c.bestTime) && c.bestTime > 0 ? c.bestTime : null;
-      d.chapters[key] = { completed: bool(c.completed, false), bestTime: best, routes: strings(c.routes) };
+      d.levels[key] = { done: bool(c.done, false), bestTime: best };
     }
   }
   if (isObj(raw.settings)) {
@@ -118,42 +135,20 @@ export function sanitize(raw: unknown): SaveData {
       batterySaver: bool(s.batterySaver, def.batterySaver),
     };
   }
-  if (isObj(raw.daily)) {
-    const last = raw.daily.lastCompleted;
-    d.daily.lastCompleted = typeof last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(last) ? last : null;
-    d.daily.streak = Math.round(num(raw.daily.streak, 0, 0, 100000));
-    if (isObj(raw.daily.bestTimes)) {
-      for (const key of Object.keys(raw.daily.bestTimes).slice(-60)) {
-        const t = raw.daily.bestTimes[key];
-        if (/^\d{4}-\d{2}-\d{2}$/.test(key) && typeof t === 'number' && Number.isFinite(t) && t > 0) d.daily.bestTimes[key] = t;
-      }
-    }
+  if (isObj(raw.checkpoint) && typeof raw.checkpoint.level === 'string' && /^a\d{2}-\d{2}$/.test(raw.checkpoint.level)) {
+    const index = Math.round(num(raw.checkpoint.index, -1, -1, 50));
+    if (index >= 0) d.checkpoint = { level: raw.checkpoint.level, index };
   }
-  if (isObj(raw.checkpoint)) {
-    const chapter = Math.round(num(raw.checkpoint.chapter, 0, 0, TOTAL_CHAPTERS));
-    const index = Math.round(num(raw.checkpoint.index, -1, -1, 200));
-    if (chapter >= 1 && index >= 0) d.checkpoint = { chapter, index };
-  }
-  if (isObj(raw.tutorial)) {
-    for (const k of ['move', 'jump', 'glow', 'pulse', 'dive', 'hide', 'dash', 'stop'] as HintKind[]) {
-      if (raw.tutorial[k] === true) d.tutorial[k] = true;
-    }
-  }
+  if (isObj(raw.hints)) for (const k of Object.keys(raw.hints).slice(0, 40)) if (raw.hints[k] === true) d.hints[k as HintKind] = true;
   return d;
 }
 
-/** Days between two yyyy-mm-dd keys (b - a). */
-function dayGap(a: string, b: string): number {
-  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
-}
+/** Story position (0-based) of a level: area 1 level 1 is 0. */
+export const levelOrder = (area: number, level: number): number => (area - 1) * LEVELS_PER_AREA + (level - 1);
 
-/**
- * Local progress. Every mutation writes through immediately; storage failures (private mode,
- * full disk) are swallowed so the game keeps running from memory.
- */
+/** Local progress. Every change writes through; storage failures fall back to memory. */
 export class SaveStore {
   data: SaveData = defaultSave();
-  /** True if the last load found unreadable data and fell back to a fresh save. */
   recovered = false;
 
   constructor(
@@ -192,7 +187,6 @@ export class SaveStore {
     }
   }
 
-  /** Erases progress but keeps the player's settings. */
   resetProgress(): void {
     const settings = this.data.settings;
     this.data = defaultSave();
@@ -205,12 +199,77 @@ export class SaveStore {
     this.save();
   }
 
-  chapter(index: number): ChapterRecord {
-    return this.data.chapters[String(index)] ?? { completed: false, bestTime: null, routes: [] };
+  /** What the Tideborn carries into a level. */
+  loadout(): Loadout {
+    const d = this.data;
+    return {
+      abilities: new Set(d.abilities),
+      rewards: new Set(d.rewards),
+      equipped: d.equipped,
+      hpMax: BASE_HP + d.upgrades.health,
+      lumenMax: BASE_LUMEN + d.upgrades.lumen * 25,
+      essenceMax: BASE_ESSENCE + d.upgrades.essence,
+      pulseLevel: d.upgrades.pulse,
+    };
   }
 
-  isUnlocked(index: number): boolean {
-    return index <= this.data.currentChapter;
+  level(id: string): LevelRecord {
+    return this.data.levels[id] ?? { done: false, bestTime: null };
+  }
+
+  isOpen(area: number, level: number): boolean {
+    return this.data.tutorialDone && levelOrder(area, level) < this.data.unlocked;
+  }
+
+  completeTutorial(): void {
+    this.data.tutorialDone = true;
+    this.data.checkpoint = null;
+    this.save();
+  }
+
+  /** Records a finished level and opens the next. Returns whether the time is a new best. */
+  completeLevel(id: string, area: number, level: number, time: number, secrets: string[]): boolean {
+    const prev = this.level(id);
+    const best = prev.bestTime === null || time < prev.bestTime;
+    this.data.levels[id] = { done: true, bestTime: best ? time : prev.bestTime };
+    this.data.unlocked = Math.min(TOTAL, Math.max(this.data.unlocked, levelOrder(area, level) + 2));
+    for (const s of secrets) if (!this.data.secrets.includes(s)) this.data.secrets.push(s);
+    this.data.checkpoint = null;
+    if (area === AREA_COUNT && level === LEVELS_PER_AREA) this.data.endingSeen = true;
+    this.save();
+    return best;
+  }
+
+  /** A shrine was used. Returns false if it was already recorded. */
+  takeGrant(id: string, what: { ability?: AbilityId; upgrade?: UpgradeId }): boolean {
+    if (this.data.grants.includes(id)) return false;
+    this.data.grants.push(id);
+    if (what.ability && !this.data.abilities.includes(what.ability)) this.data.abilities.push(what.ability);
+    if (what.upgrade) this.data.upgrades[what.upgrade]++;
+    this.save();
+    return true;
+  }
+
+  /** A guardian fell. Bosses hand over their gift, which is equipped at once. */
+  defeat(id: string, reward?: RewardId): boolean {
+    const fresh = !this.data.defeated.includes(id);
+    if (fresh) this.data.defeated.push(id);
+    if (reward && !this.data.rewards.includes(reward)) {
+      this.data.rewards.push(reward);
+      this.data.equipped = reward;
+    }
+    this.save();
+    return fresh;
+  }
+
+  /** Equips the next boss gift owned. */
+  cycleReward(): RewardId | null {
+    const r = this.data.rewards;
+    if (r.length === 0) return null;
+    const i = this.data.equipped ? r.indexOf(this.data.equipped) : -1;
+    this.data.equipped = r[(i + 1) % r.length];
+    this.save();
+    return this.data.equipped;
   }
 
   addShell(id: string): boolean {
@@ -220,8 +279,8 @@ export class SaveStore {
     return true;
   }
 
-  setCheckpoint(chapter: number, index: number): void {
-    this.data.checkpoint = { chapter, index };
+  setCheckpoint(level: string, index: number): void {
+    this.data.checkpoint = { level, index };
     this.save();
   }
 
@@ -232,38 +291,6 @@ export class SaveStore {
     }
   }
 
-  /** Records a finished chapter. Returns whether the time is a new best. */
-  completeChapter(index: number, time: number, routes: string[]): boolean {
-    const prev = this.chapter(index);
-    const best = prev.bestTime === null || time < prev.bestTime;
-    this.data.chapters[String(index)] = {
-      completed: true,
-      bestTime: best ? time : prev.bestTime,
-      routes: [...new Set([...prev.routes, ...routes])],
-    };
-    if (index >= this.data.currentChapter) this.data.currentChapter = Math.min(TOTAL_CHAPTERS, index + 1);
-    if (index === TOTAL_CHAPTERS) this.data.endingSeen = true;
-    this.data.checkpoint = null;
-    this.save();
-    return best;
-  }
-
-  /** Records today's Daily Tide. Returns whether the time is a new best for the day. */
-  completeDaily(dateKey: string, time: number): boolean {
-    const d = this.data.daily;
-    const prev = d.bestTimes[dateKey];
-    const best = prev === undefined || time < prev;
-    if (best) d.bestTimes[dateKey] = time;
-    if (d.lastCompleted !== dateKey) {
-      d.streak = d.lastCompleted !== null && dayGap(d.lastCompleted, dateKey) === 1 ? d.streak + 1 : 1;
-      d.lastCompleted = dateKey;
-    }
-    const keys = Object.keys(d.bestTimes).sort();
-    while (keys.length > 30) delete d.bestTimes[keys.shift() as string];
-    this.save();
-    return best;
-  }
-
   recordDrift(distance: number): boolean {
     if (distance <= this.data.driftBest) return false;
     this.data.driftBest = Math.round(distance);
@@ -271,14 +298,13 @@ export class SaveStore {
     return true;
   }
 
-  markTutorial(kind: HintKind): void {
-    if (this.data.tutorial[kind]) return;
-    this.data.tutorial[kind] = true;
+  markHint(kind: HintKind): void {
+    if (this.data.hints[kind]) return;
+    this.data.hints[kind] = true;
     this.save();
   }
 }
 
-/** localStorage if it works, otherwise null (the store then lives in memory). */
 export function browserStorage(): StorageLike | null {
   try {
     const s = window.localStorage;

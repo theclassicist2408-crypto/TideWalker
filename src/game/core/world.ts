@@ -1,27 +1,36 @@
-import { ASSIST_AFTER_FAILS, DIFF, P, type DifficultyTuning } from './constants';
+import { ASSIST_AFTER_FAILS, BASE_ESSENCE, BASE_HP, BASE_LUMEN, DIFF, P, type DifficultyTuning } from './constants';
 import type {
+  AbilityId,
+  ArenaDef,
+  BlockDef,
   CheckpointDef,
   CurrentDef,
   Difficulty,
+  EnemyKind,
   EventType,
-  FishKind,
   GameEvent,
   GameMode,
   GateDef,
   GeyserDef,
+  GrantDef,
   Intent,
   KinDef,
   LevelData,
+  Loadout,
   PlatformDef,
+  RewardId,
   ShellDef,
   StoneDef,
 } from './types';
 import { Heightfield, OPEN_SKY } from '../systems/terrain';
 import { Tide } from '../systems/tide';
 import { updatePlayer } from '../entities/player';
-import { resetFish, updateFish } from '../entities/fish';
-import { pulseProps, resetProps, updateProps } from '../entities/props';
-import { updateLumen } from '../systems/lumen';
+import { resetEnemies, spawnEnemy, updateEnemies } from '../entities/enemies';
+import { resetBoss, updateBoss, type BossState } from '../entities/bosses';
+import { resetProps, updateProps } from '../entities/props';
+import { updateArenas, updateHazards, updateRules } from '../systems/combat';
+
+export type SlashDir = 'side' | 'up' | 'down';
 
 export interface PlayerState {
   x: number;
@@ -35,78 +44,150 @@ export interface PlayerState {
   onPlatform: PlatformState | null;
   swim: boolean;
   wading: boolean;
+  hp: number;
   lumen: number;
+  essence: number;
   glowOn: boolean;
-  /** Smoothed 0..1 glow amount for visuals and light radius. */
   glow: number;
-  /** Glow needs a little Lumen back before it can restart after running dry. */
-  glowLocked: boolean;
   pulseCd: number;
   pulseFlash: number;
   invuln: number;
-  hidden: boolean;
-  crouch: boolean;
   dashT: number;
   dashCd: number;
   dashDir: number;
   airDashed: boolean;
+  jumpsLeft: number;
   coyote: number;
   buffer: number;
   jumping: boolean;
+  gliding: boolean;
+  /** Side of the wall being touched (-1 left, 1 right) while `wallT` > 0. */
+  wallDir: number;
+  wallT: number;
+  clingT: number;
+  sliding: boolean;
+  /** Steering is ignored briefly after a wall jump or a hit. */
+  lockT: number;
   leapArm: number;
   dropT: number;
-  fadeT: number;
-  inKelp: boolean;
+  slashT: number;
+  slashCd: number;
+  slashDir: SlashDir;
+  slashId: number;
+  charged: boolean;
+  chargeT: number;
+  healT: number;
+  abilityCd: number;
+  veilT: number;
+  shield: number;
+  emberT: number;
+  bloomT: number;
+  crownT: number;
+  hookT: number;
+  hookX: number;
+  hookY: number;
+  slamming: boolean;
   inPool: boolean;
   inSafe: boolean;
-  /** 0..1 proximity of the nearest alerted fish, for danger feedback. */
+  /** 0..1 nearness of anything hostile, for music and feedback. */
   danger: number;
-  status: 'alive' | 'caught' | 'swept';
+  status: 'alive' | 'dead';
   statusT: number;
+  /** Last place the creature stood safely (spikes return it here). */
+  safeX: number;
+  safeY: number;
 }
 
-export type FishMode = 'dormant' | 'patrol' | 'investigate' | 'linger' | 'windup' | 'lunge' | 'recover' | 'return' | 'stunned';
+export type EnemyMode = 'idle' | 'windup' | 'attack' | 'rest' | 'stun' | 'hidden';
 
-export interface FishState {
-  kind: FishKind;
+export interface EnemyState {
+  kind: EnemyKind;
   x: number;
   y: number;
   prevX: number;
   prevY: number;
   vx: number;
   vy: number;
-  hx1: number;
-  hy1: number;
-  hx2: number;
-  hy2: number;
-  /** Which end of the patrol path the fish is heading to (0 or 1). */
-  leg: number;
-  mode: FishMode;
+  homeX: number;
+  homeY: number;
+  x0: number;
+  x1: number;
+  hp: number;
+  hpMax: number;
+  facing: number;
+  mode: EnemyMode;
   t: number;
-  tx: number;
-  ty: number;
-  /** Lunge direction. */
-  lx: number;
-  ly: number;
-  /** 0..1 awareness, drives eye glow and warnings. */
-  alert: number;
-  /** Angler: how long light has been held nearby. */
-  curiosity: number;
-  missed: boolean;
-  rippleT: number;
+  /** Free per-kind scratch values (aim, counters). */
+  a: number;
+  b: number;
+  elite: boolean;
+  arena: number;
+  wave: number;
+  /** Waiting for its arena wave. */
+  active: boolean;
+  alive: boolean;
+  onGround: boolean;
+  flash: number;
+  burn: number;
+  lastHit: number;
+  /** Seconds since spawn-in began; enemies fade in before they can act. */
+  spawnT: number;
+}
+
+export interface Projectile {
+  alive: boolean;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  gravity: number;
+  r: number;
+  life: number;
+  dmg: number;
+  hostile: boolean;
+  /** orb: free flight. wave: hugs the floor. echo: the player's sound line. */
+  kind: 'orb' | 'wave' | 'echo';
+  hitId: number;
+}
+
+export interface Zone {
+  alive: boolean;
+  circle: boolean;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Warning time left; the zone only hurts once this reaches zero. */
+  warn: number;
+  warn0: number;
+  dur: number;
+  dmg: number;
+  struck: boolean;
+}
+
+export interface ArenaState extends ArenaDef {
+  state: 'idle' | 'active' | 'done';
+  waveNow: number;
+  timer: number;
 }
 
 export interface PlatformState extends PlatformDef {
+  x0: number;
+  y0: number;
   lit: number;
   litT: number;
   solid: boolean;
-  /** Crumble: -1 idle, counts down once stood on. */
   timer: number;
   fallen: number;
+  mvx: number;
+  mvy: number;
+}
+
+export interface BlockState extends BlockDef {
+  broken: boolean;
 }
 
 export interface CurrentState extends CurrentDef {
-  /** -1..1 current strength right now (sign flips for `flip` currents). */
   power: number;
 }
 
@@ -123,7 +204,6 @@ export interface FireflyState {
 }
 
 export interface GeyserState extends GeyserDef {
-  /** 0 idle, 0..1 warning ramp, 2 erupting. */
   phaseNow: number;
   fired: boolean;
 }
@@ -143,7 +223,6 @@ export interface StoneState extends StoneDef {
 export interface ShellState extends ShellDef {
   taken: boolean;
   revealed: boolean;
-  /** True if the player already owned this shell before the run. */
   owned: boolean;
 }
 
@@ -162,19 +241,45 @@ export interface KinState extends KinDef {
   slot: number;
 }
 
+export interface GrantState extends GrantDef {
+  taken: boolean;
+}
+
+export interface MutableLoadout {
+  abilities: Set<AbilityId>;
+  rewards: Set<RewardId>;
+  equipped: RewardId | null;
+  hpMax: number;
+  lumenMax: number;
+  essenceMax: number;
+  pulseLevel: number;
+}
+
 export interface WorldOptions {
   difficulty: Difficulty;
   mode: GameMode;
+  loadout?: Loadout;
   ownedShells?: ReadonlySet<string>;
-  /** Start at this checkpoint index (resume). */
+  /** Guardians already beaten: their arenas stay open and their shrines are free. */
+  defeated?: ReadonlySet<string>;
+  /** Grant ids (`level:index`) already taken. */
+  taken?: ReadonlySet<string>;
   startCheckpoint?: number;
-  /** Multiplies tide speed (Daily Tide conditions). */
-  tideScale?: number;
-  /** Multiplies Lumen drain (Daily Tide conditions). */
-  drainScale?: number;
 }
 
-const MAX_EVENTS = 96;
+export const emptyLoadout = (): Loadout => ({
+  abilities: new Set(),
+  rewards: new Set(),
+  equipped: null,
+  hpMax: BASE_HP,
+  lumenMax: BASE_LUMEN,
+  essenceMax: BASE_ESSENCE,
+  pulseLevel: 0,
+});
+
+const MAX_EVENTS = 128;
+const MAX_PROJECTILES = 96;
+const MAX_ZONES = 48;
 
 /** The whole simulation for one level. Pure logic: no rendering, audio or DOM. */
 export class World {
@@ -185,12 +290,20 @@ export class World {
   readonly ground: Heightfield;
   readonly ceil: Heightfield;
   readonly tide: Tide;
-  readonly tideScale: number;
-  readonly drainScale: number;
+  /** Enemy strength tier, from the area (1–10). */
+  readonly tier: number;
+  readonly load: MutableLoadout;
+  readonly defeated: Set<string>;
+  private readonly takenGrants: ReadonlySet<string>;
 
   player: PlayerState;
-  fish: FishState[] = [];
+  enemies: EnemyState[] = [];
+  boss: BossState | null = null;
+  readonly projectiles: Projectile[] = [];
+  readonly zones: Zone[] = [];
+  arenas: ArenaState[] = [];
   platforms: PlatformState[] = [];
+  blocks: BlockState[] = [];
   currents: CurrentState[] = [];
   plants: PlantState[] = [];
   fireflies: FireflyState[] = [];
@@ -200,14 +313,17 @@ export class World {
   shells: ShellState[] = [];
   checkpoints: CheckpointState[] = [];
   kin: KinState[] = [];
+  grants: GrantState[] = [];
   secretsFound = new Set<string>();
 
-  /** Surface y of the water this step. */
   waterY = 0;
-  /** Seconds played in this run (drives best times). */
+  /** Extra water height a boss can summon into its arena (px, positive = higher). */
+  flood = 0;
+  floodTarget = 0;
   time = 0;
-  /** Simulation clock for periodic props; never rewinds. */
   clock = 0;
+  /** Frames of impact freeze requested by a hit; the game loop honours it. */
+  hitstop = 0;
   status: 'playing' | 'failed' | 'complete' = 'playing';
   checkpointIndex = -1;
   checkpointTide = 0;
@@ -215,8 +331,14 @@ export class World {
   totalFails = 0;
   assist = false;
   kinAwake = 0;
-  /** Left edge the player may not cross (moves in Drift Mode). */
   minX = 10;
+  /** Chase levels: x of the advancing dark. */
+  chaseX = -600;
+  /** Timed levels: seconds left. */
+  timeLeft = 0;
+  hitsTaken = 0;
+  private slashSeq = 0;
+  private ached = false;
 
   readonly events: GameEvent[] = [];
   eventCount = 0;
@@ -226,16 +348,29 @@ export class World {
     this.mode = opts.mode;
     this.difficulty = opts.difficulty;
     this.diff = DIFF[opts.difficulty];
-    this.tideScale = opts.tideScale ?? 1;
-    this.drainScale = opts.drainScale ?? 1;
+    this.tier = Math.max(1, level.area);
     this.ground = new Heightfield(level.groundX.slice(), level.groundY.slice());
     this.ceil = new Heightfield(level.ceilX.slice(), level.ceilY.slice(), OPEN_SKY);
     this.tide = new Tide(level.tide);
+    this.defeated = new Set(opts.defeated ?? []);
+    this.takenGrants = opts.taken ?? new Set();
+    const l = opts.loadout ?? emptyLoadout();
+    this.load = {
+      abilities: new Set(l.abilities),
+      rewards: new Set(l.rewards),
+      equipped: l.equipped,
+      hpMax: Math.max(2, l.hpMax + this.diff.hpBonus),
+      lumenMax: l.lumenMax,
+      essenceMax: l.essenceMax,
+      pulseLevel: l.pulseLevel,
+    };
     for (let i = 0; i < MAX_EVENTS; i++) this.events.push({ type: 'jump', x: 0, y: 0, v: 0 });
+    for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push({ alive: false, x: 0, y: 0, vx: 0, vy: 0, gravity: 0, r: 6, life: 0, dmg: 1, hostile: true, kind: 'orb', hitId: 0 });
+    for (let i = 0; i < MAX_ZONES; i++) this.zones.push({ alive: false, circle: false, x: 0, y: 0, w: 0, h: 0, warn: 0, warn0: 1, dur: 0, dmg: 1, struck: false });
 
-    const owned = opts.ownedShells ?? new Set<string>();
-    this.addEntities(level, owned);
+    this.addEntities(level, opts.ownedShells ?? new Set<string>());
     this.player = this.makePlayer(level.spawn.x, level.spawn.y);
+    this.timeLeft = (level.rules.timeLimit ?? 0) * this.diff.mercy;
 
     const start = opts.startCheckpoint ?? -1;
     if (start >= 0 && start < this.checkpoints.length) {
@@ -244,55 +379,38 @@ export class World {
       this.checkpointIndex = start;
       this.checkpointTide = cp.tideCap * 0.8;
       this.tide.setTime(this.checkpointTide);
-      this.player.x = this.player.prevX = cp.x;
-      this.player.y = this.player.prevY = cp.y;
+      this.player.x = this.player.prevX = this.player.safeX = cp.x;
+      this.player.y = this.player.prevY = this.player.safeY = cp.y;
+      // Anything behind the lantern has already been dealt with.
+      for (const a of this.arenas) if (a.x1 < cp.x) a.state = 'done';
     }
     this.waterY = this.tide.level;
-    resetFish(this);
+    resetEnemies(this);
+    resetBoss(this);
   }
 
-  /** Registers the entities of a level (or of a streamed Drift chunk). */
-  addEntities(level: LevelData, owned: ReadonlySet<string>): void {
-    for (const d of level.platforms) this.platforms.push({ ...d, lit: 0, litT: 0, solid: d.kind !== 'moonglass', timer: -1, fallen: 0 });
+  private addEntities(level: LevelData, owned: ReadonlySet<string>): void {
+    for (const d of level.platforms) this.platforms.push({ ...d, x0: d.x, y0: d.y, lit: 0, litT: 0, solid: d.kind !== 'moonglass', timer: -1, fallen: 0, mvx: 0, mvy: 0 });
+    for (const d of level.blocks) this.blocks.push({ ...d, broken: false });
     for (const d of level.currents) this.currents.push({ ...d, power: 0 });
     for (const d of level.plants) this.plants.push({ x: d.x, y: d.y, cd: 0 });
     for (const d of level.fireflies) this.fireflies.push({ x: d.x, y: d.y, taken: false });
     for (const d of level.geysers) this.geysers.push({ ...d, phaseNow: 0, fired: false });
-    for (const d of level.gates) this.gates.push({ ...d, open: false, prog: 0 });
+    for (const d of level.gates) this.gates.push({ ...d, open: d.kind === 'arena', prog: d.kind === 'arena' ? 1 : 0 });
     for (const d of level.stones) this.stones.push({ ...d, cy: d.y, vy: 0, mode: 'hang', t: 0 });
     for (const d of level.shells) this.shells.push({ ...d, taken: false, revealed: !d.hidden, owned: owned.has(d.id) });
     for (const d of level.checkpoints) {
       if (d.gentleOnly && this.difficulty !== 'gentle') continue;
       this.checkpoints.push({ ...d, lit: false });
     }
-    let slot = this.kin.length;
+    let slot = 0;
     for (const d of level.kin) this.kin.push({ ...d, awake: false, cx: d.x, cy: d.y, vx: 0, vy: 0, life: 0, gone: false, slot: slot++ });
-    for (const d of level.fish) {
-      this.fish.push({
-        kind: d.kind,
-        x: d.x,
-        y: d.y,
-        prevX: d.x,
-        prevY: d.y,
-        vx: 0,
-        vy: 0,
-        hx1: d.x,
-        hy1: d.y,
-        hx2: d.x2,
-        hy2: d.y2,
-        leg: 1,
-        mode: 'patrol',
-        t: 0,
-        tx: d.x,
-        ty: d.y,
-        lx: 1,
-        ly: 0,
-        alert: 0,
-        curiosity: 0,
-        missed: false,
-        rippleT: 0,
-      });
+    level.grants.forEach((d, i) => this.grants.push({ ...d, taken: this.takenGrants.has(`${level.id}:${i}`) }));
+    for (const d of level.arenas) {
+      const beaten = (d.miniboss !== undefined && this.defeated.has(d.miniboss)) || (d.boss !== undefined && this.defeated.has(d.boss) && this.mode !== 'rematch');
+      this.arenas.push({ ...d, state: beaten ? 'done' : 'idle', waveNow: -1, timer: 0 });
     }
+    for (const d of level.enemies) spawnEnemy(this, d.kind, d.x, d.y, d.x0, d.x1, d.elite ?? false, d.arena ?? -1, d.wave ?? 0);
   }
 
   private makePlayer(x: number, y: number): PlayerState {
@@ -308,32 +426,63 @@ export class World {
       onPlatform: null,
       swim: false,
       wading: false,
-      lumen: this.diff.lumenMax,
+      hp: this.load.hpMax,
+      lumen: this.load.lumenMax,
+      essence: 0,
       glowOn: false,
       glow: 0,
-      glowLocked: false,
       pulseCd: 0,
       pulseFlash: 0,
       invuln: 0,
-      hidden: false,
-      crouch: false,
       dashT: 0,
       dashCd: 0,
       dashDir: 1,
       airDashed: false,
+      jumpsLeft: 1,
       coyote: 0,
       buffer: 0,
       jumping: false,
+      gliding: false,
+      wallDir: 0,
+      wallT: 0,
+      clingT: 0,
+      sliding: false,
+      lockT: 0,
       leapArm: 0,
       dropT: 0,
-      fadeT: 0,
-      inKelp: false,
+      slashT: 0,
+      slashCd: 0,
+      slashDir: 'side',
+      slashId: 0,
+      charged: false,
+      chargeT: 0,
+      healT: 0,
+      abilityCd: 0,
+      veilT: 0,
+      shield: 0,
+      emberT: 0,
+      bloomT: 0,
+      crownT: 0,
+      hookT: 0,
+      hookX: 0,
+      hookY: 0,
+      slamming: false,
       inPool: false,
       inSafe: false,
       danger: 0,
       status: 'alive',
       statusT: 0,
+      safeX: x,
+      safeY: y,
     };
+  }
+
+  has(ability: AbilityId): boolean {
+    return this.load.abilities.has(ability);
+  }
+
+  nextSlashId(): number {
+    return ++this.slashSeq;
   }
 
   emit(type: EventType, x: number, y: number, v = 0): void {
@@ -345,49 +494,100 @@ export class World {
     e.v = v;
   }
 
-  /** Call after the frame's events have been consumed. */
   clearEvents(): void {
     this.eventCount = 0;
   }
 
   get lumenFrac(): number {
-    return this.player.lumen / this.diff.lumenMax;
+    return this.player.lumen / this.load.lumenMax;
   }
 
-  /** Radius the creature's own light reaches right now. */
   get lightRadius(): number {
     const p = this.player;
-    const f = 0.62 + 0.38 * Math.min(1, this.lumenFrac * 1.6);
-    return P.ambientRadius * (0.7 + 0.3 * f) + (P.glowRadius - P.ambientRadius) * p.glow * f;
+    const veil = p.veilT > 0 ? 0.55 : 1;
+    return (P.ambientRadius + (P.glowRadius - P.ambientRadius) * p.glow) * veil;
   }
 
   get tideRate(): number {
-    return this.diff.tideRate * this.tideScale * (this.assist ? 0.78 : 1);
+    return this.diff.tideRate * (this.level.rules.tideRush ?? 1) * (this.assist ? 0.78 : 1);
   }
 
-  get fishSpeedScale(): number {
-    return this.diff.fishSpeed * (this.assist ? 0.85 : 1);
+  /** Multiplier on enemy speed and attack cadence. */
+  get pace(): number {
+    return this.diff.enemySpeed * (1 + 0.035 * (this.tier - 1)) * (this.assist ? 0.88 : 1);
   }
 
-  /** Advances the simulation by one fixed step. */
+  /** Multiplier on telegraph time. */
+  get warnScale(): number {
+    return this.diff.telegraph * (this.assist ? 1.2 : 1);
+  }
+
+  /** How far enemies notice the creature: light carries, the veil hides. */
+  get noticeScale(): number {
+    const p = this.player;
+    return (p.glowOn ? 1.6 : 1) * (p.veilT > 0 ? 0.45 : 1);
+  }
+
+  spawnProjectile(x: number, y: number, vx: number, vy: number, r: number, life: number, hostile: boolean, kind: Projectile['kind'] = 'orb', gravity = 0, dmg = 1): Projectile | null {
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const s = this.projectiles[i];
+      if (s.alive) continue;
+      s.alive = true;
+      s.x = x;
+      s.y = y;
+      s.vx = vx;
+      s.vy = vy;
+      s.r = r;
+      s.life = life;
+      s.hostile = hostile;
+      s.kind = kind;
+      s.gravity = gravity;
+      s.dmg = dmg;
+      s.hitId = 0;
+      return s;
+    }
+    return null;
+  }
+
+  /** A telegraphed danger area: shown for `warn` seconds, then harmful for `dur`. */
+  spawnZone(circle: boolean, x: number, y: number, w: number, h: number, warn: number, dur: number, dmg = 1): Zone | null {
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+      if (z.alive) continue;
+      z.alive = true;
+      z.circle = circle;
+      z.x = x;
+      z.y = y;
+      z.w = w;
+      z.h = h;
+      z.warn = warn * this.warnScale;
+      z.warn0 = z.warn;
+      z.dur = dur;
+      z.dmg = dmg;
+      z.struck = false;
+      this.emit('zoneWarn', circle ? x : x + w / 2, circle ? y : y + h / 2, 0);
+      return z;
+    }
+    return null;
+  }
+
   step(intent: Intent, dt: number): void {
     this.clock += dt;
     if (this.status === 'playing') {
       this.time += dt;
       this.tide.update(dt * this.tideRate);
     }
-    this.waterY = this.tide.level;
+    this.flood += (this.floodTarget - this.flood) * Math.min(1, dt * 1.2);
+    this.waterY = this.tide.level - this.flood;
     updateProps(this, dt);
     updatePlayer(this, intent, dt);
     if (this.status !== 'playing') return;
-    updateFish(this, dt);
-    updateLumen(this, dt);
+    updateArenas(this, dt);
+    updateEnemies(this, dt);
+    updateBoss(this, dt);
+    updateHazards(this, dt);
+    updateRules(this, dt);
     this.checkProgress();
-  }
-
-  /** A Lumen Pulse: pushes fish, wakes moonglass, gates and kin. */
-  pulse(x: number, y: number): void {
-    pulseProps(this, x, y);
   }
 
   private checkProgress(): void {
@@ -401,50 +601,83 @@ export class World {
         this.checkpointTide = Math.min(this.tide.time, cp.tideCap);
         this.failsHere = 0;
         this.assist = false;
-        p.lumen = Math.min(this.diff.lumenMax, p.lumen + this.diff.lumenMax * 0.45);
+        p.hp = this.load.hpMax;
+        p.lumen = this.load.lumenMax;
         this.emit('checkpoint', cp.x, cp.y, i);
       }
     }
-    if (this.mode !== 'drift' && this.mode !== 'title' && p.x >= this.level.goalX) {
+    if (this.mode === 'tutorial' && !this.ached && p.hp >= this.load.hpMax) {
+      // The healing lesson needs something to heal: an old wound aches as the creature reaches it.
+      for (const h of this.level.hints) {
+        if (h.kind === 'heal' && p.x > h.x && p.x < h.x + h.w) {
+          this.ached = true;
+          p.hp -= 2;
+          p.essence = this.load.essenceMax;
+          this.emit('hurt', p.x, p.y, 0);
+        }
+      }
+    }
+    const story = this.mode === 'story' || this.mode === 'tutorial' || this.mode === 'rematch';
+    if (story && p.x >= this.level.goalX) {
       this.status = 'complete';
       this.emit('goal', p.x, p.y, 0);
     }
   }
 
-  fail(kind: 'caught' | 'swept'): void {
+  /** The Tideborn's light goes out; the level returns it to the last lantern. */
+  kill(): void {
     if (this.status !== 'playing' || this.mode === 'drift' || this.mode === 'title') return;
     const p = this.player;
     this.status = 'failed';
-    p.status = kind;
+    p.status = 'dead';
     p.statusT = 0;
+    p.hp = 0;
     p.glowOn = false;
     this.failsHere++;
     this.totalFails++;
-    this.emit(kind, p.x, p.y, 0);
+    this.emit('death', p.x, p.y, 0);
   }
 
-  /** Returns the player to the last checkpoint with the world gently reset. */
   respawn(): void {
     const cp = this.checkpointIndex >= 0 ? this.checkpoints[this.checkpointIndex] : null;
     const sx = cp ? cp.x : this.level.spawn.x;
     const sy = cp ? cp.y : this.level.spawn.y;
-    const keepFacing = this.player.facing;
     this.player = this.makePlayer(sx, sy);
-    this.player.facing = keepFacing >= 0 ? 1 : -1;
-    this.player.invuln = 1.2;
+    this.player.invuln = 1;
     const wasAssist = this.assist;
     this.assist = this.failsHere >= ASSIST_AFTER_FAILS;
-    const rewind = this.checkpointTide * (this.assist ? 0.85 : 1);
-    this.tide.setTime(rewind);
+    this.tide.setTime(this.checkpointTide * (this.assist ? 0.85 : 1));
+    this.flood = this.floodTarget = 0;
     this.waterY = this.tide.level;
+    this.chaseX = sx - 520;
+    if (this.level.rules.timeLimit) {
+      // The clock restarts in proportion to the ground still to cover.
+      const left = (this.level.goalX - sx) / Math.max(1, this.level.goalX - this.level.spawn.x);
+      this.timeLeft = this.level.rules.timeLimit * this.diff.mercy * (0.15 + 0.85 * left) * (this.assist ? 1.25 : 1);
+    }
+    for (const z of this.zones) z.alive = false;
+    for (const s of this.projectiles) s.alive = false;
+    for (const a of this.arenas) {
+      if (a.state === 'active') {
+        a.state = 'idle';
+        a.waveNow = -1;
+        a.timer = 0;
+      }
+    }
+    for (const g of this.gates) {
+      if (g.kind === 'arena') {
+        g.open = true;
+        g.prog = 1;
+      }
+    }
     resetProps(this);
-    resetFish(this);
+    resetEnemies(this);
+    resetBoss(this);
     this.status = 'playing';
     this.emit('respawn', sx, sy, 0);
     if (this.assist && !wasAssist) this.emit('assist', sx, sy, 0);
   }
 
-  /** Shell ids collected during this run (including ones owned before). */
   collectedShellIds(): string[] {
     const out: string[] = [];
     for (const s of this.shells) if (s.taken) out.push(s.id);

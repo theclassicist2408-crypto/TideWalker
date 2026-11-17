@@ -1,17 +1,16 @@
 import { P } from '../core/constants';
 import { approach, clamp } from '../core/util';
 import type { World } from '../core/world';
-import { addLumen, drainLumen } from '../systems/lumen';
-import { pulseFish } from './fish';
+import { hurtPlayer, pulseCombat } from '../systems/combat';
 
-const PLANT_LUMEN = 36;
-const PLANT_REGROW = 14;
-const FIREFLY_LUMEN = 10;
+const PLANT_LUMEN = 40;
+const PLANT_REGROW = 10;
+const FIREFLY_LUMEN = 12;
 const GEYSER_WARN = 0.9;
 const GEYSER_ON = 1.1;
-const GATE_OPEN_TIME = 0.8;
+const GATE_OPEN_TIME = 0.6;
 
-/** Restores everything that a respawn should restore. Opened gates and collected shells stay. */
+/** Restores everything a respawn should restore. Opened gates, broken walls and shells stay. */
 export function resetProps(w: World): void {
   for (const pl of w.platforms) {
     pl.lit = 0;
@@ -28,37 +27,19 @@ export function resetProps(w: World): void {
     s.mode = 'hang';
     s.t = 0;
   }
-  for (const k of w.kin) {
-    if (k.flee && k.awake) continue;
-    if (!k.awake) {
-      k.cx = k.x;
-      k.cy = k.y;
-    }
-  }
 }
 
-function sting(w: World, fromX: number, fromY: number, amount: number): void {
-  const p = w.player;
-  if (p.invuln > 0) return;
-  drainLumen(w, amount);
-  p.invuln = 1;
-  const dx = p.x - fromX;
-  const dy = p.y - fromY;
-  const d = Math.hypot(dx, dy) || 1;
-  p.vx = (dx / d) * 190;
-  p.vy = (dy / d) * 150 - 90;
-  p.dashT = 0;
-  w.emit('sting', p.x, p.y, amount);
+function addLumen(w: World, amount: number): void {
+  w.player.lumen = clamp(w.player.lumen + amount, 0, w.load.lumenMax);
 }
 
-/** Environmental props: currents, moonglass, crumbling ledges, geysers, gates, stones, pickups, kin. */
+/** Environmental props: currents, platforms, geysers, gates, stones, pickups, shrines, kin. */
 export function updateProps(w: World, dt: number): void {
   const p = w.player;
   const alive = p.status === 'alive';
   const radius = w.lightRadius;
   const glowing = p.glowOn && alive;
 
-  // Currents follow the tide.
   for (let i = 0; i < w.currents.length; i++) {
     const c = w.currents[i];
     let target = 1;
@@ -73,9 +54,19 @@ export function updateProps(w: World, dt: number): void {
     c.power = approach(c.power, target, dt * 1.6);
   }
 
-  // Moonglass ledges exist only in light; crumbling ledges fall and reform.
   for (let i = 0; i < w.platforms.length; i++) {
     const pl = w.platforms[i];
+    if (pl.period) {
+      // Moving platforms glide back and forth on a cosine so they pause at each end.
+      const k = 0.5 - 0.5 * Math.cos(((w.clock % pl.period) / pl.period) * Math.PI * 2);
+      const nx = pl.x0 + (pl.dx ?? 0) * k;
+      const ny = pl.y0 + (pl.dy ?? 0) * k;
+      pl.mvx = (nx - pl.x) / dt;
+      pl.mvy = (ny - pl.y) / dt;
+      if (p.onPlatform === pl) p.y += ny - pl.y;
+      pl.x = nx;
+      pl.y = ny;
+    }
     if (pl.kind === 'moonglass') {
       pl.litT = Math.max(0, pl.litT - dt);
       let lit = pl.litT > 0;
@@ -85,7 +76,7 @@ export function updateProps(w: World, dt: number): void {
         const dy = pl.y - p.y;
         lit = dx * dx + dy * dy < radius * radius;
       }
-      pl.lit = approach(pl.lit, lit ? 1 : 0, dt * (lit ? 6 : 1.3));
+      pl.lit = approach(pl.lit, lit ? 1 : 0, dt * (lit ? 7 : 1.3));
       pl.solid = pl.lit > 0.35;
     } else if (pl.kind === 'crumble') {
       if (pl.fallen > 0) {
@@ -98,7 +89,7 @@ export function updateProps(w: World, dt: number): void {
         pl.timer -= dt;
         if (pl.timer <= 0) {
           pl.solid = false;
-          pl.fallen = 3.5;
+          pl.fallen = 2.6;
           pl.timer = -1;
           w.emit('crumble', pl.x + pl.w / 2, pl.y, 0);
         }
@@ -106,7 +97,6 @@ export function updateProps(w: World, dt: number): void {
     }
   }
 
-  // Geysers: a warning hiss of bubbles, then a column that throws the creature upward.
   for (let i = 0; i < w.geysers.length; i++) {
     const g = w.geysers[i];
     const t = (w.clock + g.phase) % g.period;
@@ -121,6 +111,7 @@ export function updateProps(w: World, dt: number): void {
         p.onGround = false;
         p.jumping = false;
         p.airDashed = false;
+        p.jumpsLeft = 1;
         if (!g.fired) {
           g.fired = true;
           w.emit('jump', p.x, p.y, 1);
@@ -134,10 +125,11 @@ export function updateProps(w: World, dt: number): void {
     }
   }
 
-  // Gates.
   for (let i = 0; i < w.gates.length; i++) {
     const g = w.gates[i];
-    if (g.kind === 'tide') {
+    if (g.kind === 'arena') {
+      g.prog = approach(g.prog, g.open ? 1 : 0, dt * 5);
+    } else if (g.kind === 'tide') {
       const open = (g.openAbove !== undefined && w.waterY <= g.openAbove) || (g.openBelow !== undefined && w.waterY >= g.openBelow);
       if (open !== g.open) {
         g.open = open;
@@ -147,7 +139,7 @@ export function updateProps(w: World, dt: number): void {
     } else if (!g.open) {
       const dx = p.x - g.x;
       const dy = p.y - (g.y - g.h / 2);
-      const near = glowing && dx * dx + dy * dy < 118 * 118;
+      const near = glowing && dx * dx + dy * dy < 130 * 130;
       g.prog = clamp(g.prog + (near ? dt / GATE_OPEN_TIME : -dt * 0.6), 0, 1);
       if (g.prog >= 1) {
         g.open = true;
@@ -156,22 +148,21 @@ export function updateProps(w: World, dt: number): void {
     }
   }
 
-  // Loose stones in the ruins.
   for (let i = 0; i < w.stones.length; i++) {
     const s = w.stones[i];
     if (s.mode === 'hang') {
-      if (alive && Math.abs(p.x - s.x) < 44 && p.y > s.y) {
+      if (alive && Math.abs(p.x - s.x) < 50 && p.y > s.y) {
         s.mode = 'warn';
-        s.t = 0.65;
+        s.t = 0.55 * w.warnScale;
         w.emit('stoneWarn', s.x, s.y, 0);
       }
     } else if (s.mode === 'warn') {
       s.t -= dt;
       if (s.t <= 0) s.mode = 'fall';
     } else if (s.mode === 'fall') {
-      s.vy = Math.min(520, s.vy + 900 * dt);
+      s.vy = Math.min(620, s.vy + 1100 * dt);
       s.cy += s.vy * dt;
-      if (alive && Math.abs(p.x - s.x) < 15 && Math.abs(p.y - s.cy) < 16) sting(w, s.x, s.cy - 10, w.diff.sting);
+      if (alive && Math.abs(p.x - s.x) < 15 && Math.abs(p.y - s.cy) < 16) hurtPlayer(w, 1, s.x, s.cy - 10);
       if (s.cy >= s.restY) {
         s.cy = s.restY;
         s.mode = 'rest';
@@ -182,16 +173,25 @@ export function updateProps(w: World, dt: number): void {
 
   if (!alive) return;
 
-  // Urchins sting.
+  p.inPool = false;
+  for (let i = 0; i < w.level.pools.length; i++) {
+    const pool = w.level.pools[i];
+    const dx = p.x - pool.x;
+    const dy = p.y - pool.y;
+    if (dx * dx + dy * dy < pool.r * pool.r) {
+      p.inPool = true;
+      break;
+    }
+  }
+
   for (let i = 0; i < w.level.urchins.length; i++) {
     const u = w.level.urchins[i];
     const dx = p.x - u.x;
     const dy = p.y - u.y;
-    const r = u.r + P.halfW - 2;
-    if (dx * dx + dy * dy < r * r) sting(w, u.x, u.y, w.diff.sting);
+    const r = u.r + P.halfW - 3;
+    if (dx * dx + dy * dy < r * r) hurtPlayer(w, 1, u.x, u.y);
   }
 
-  // Glow plants and fireflies restore Lumen.
   for (let i = 0; i < w.plants.length; i++) {
     const pl = w.plants[i];
     if (pl.cd > 0) {
@@ -200,7 +200,7 @@ export function updateProps(w: World, dt: number): void {
     }
     const dx = p.x - pl.x;
     const dy = p.y - (pl.y - 10);
-    if (dx * dx + dy * dy < 24 * 24 && p.lumen < w.diff.lumenMax - 1) {
+    if (dx * dx + dy * dy < 24 * 24 && p.lumen < w.load.lumenMax - 1) {
       pl.cd = PLANT_REGROW;
       addLumen(w, PLANT_LUMEN);
       w.emit('plant', pl.x, pl.y - 12, PLANT_LUMEN);
@@ -218,7 +218,6 @@ export function updateProps(w: World, dt: number): void {
     }
   }
 
-  // Memory Shells: hidden ones must be lit before they can be gathered.
   for (let i = 0; i < w.shells.length; i++) {
     const s = w.shells[i];
     if (s.taken) continue;
@@ -232,7 +231,27 @@ export function updateProps(w: World, dt: number): void {
     }
   }
 
-  // Optional routes.
+  // Shrines: a lost ability returns, or the creature grows a little.
+  for (let i = 0; i < w.grants.length; i++) {
+    const g = w.grants[i];
+    if (g.taken || (g.after !== undefined && !w.defeated.has(g.after))) continue;
+    const dx = p.x - g.x;
+    const dy = p.y - g.y;
+    if (dx * dx + dy * dy < 30 * 30) {
+      g.taken = true;
+      if (g.ability) w.load.abilities.add(g.ability);
+      if (g.upgrade === 'health') {
+        w.load.hpMax++;
+        p.hp = w.load.hpMax;
+      } else if (g.upgrade === 'lumen') {
+        w.load.lumenMax += 25;
+        p.lumen = w.load.lumenMax;
+      } else if (g.upgrade === 'essence') w.load.essenceMax++;
+      else if (g.upgrade === 'pulse') w.load.pulseLevel++;
+      w.emit('grant', g.x, g.y, i);
+    }
+  }
+
   for (let i = 0; i < w.level.secrets.length; i++) {
     const z = w.level.secrets[i];
     if (w.secretsFound.has(z.id)) continue;
@@ -242,27 +261,26 @@ export function updateProps(w: World, dt: number): void {
     }
   }
 
-  // Kin: other small lights that answer the creature's glow.
   for (let i = 0; i < w.kin.length; i++) {
     const k = w.kin[i];
     if (k.gone) continue;
     if (!k.awake) {
       const dx = p.x - k.x;
       const dy = p.y - k.y;
-      if (glowing && dx * dx + dy * dy < 130 * 130) wakeKin(w, i);
+      if (glowing && dx * dx + dy * dy < 140 * 140) wakeKin(w, i);
       continue;
     }
     k.life += dt;
     if (k.flee) {
-      k.vx = approach(k.vx, 130, 160 * dt);
+      k.vx = approach(k.vx, 150, 200 * dt);
       k.cx += k.vx * dt;
       k.cy += Math.sin(k.life * 3.1) * 22 * dt - 8 * dt;
       if (k.life > 6) k.gone = true;
     } else {
       const tx = p.x - p.facing * (30 + (k.slot % 7) * 22);
       const ty = p.y - 18 - (k.slot % 4) * 15 + Math.sin(k.life * 2.2 + k.slot) * 7;
-      k.vx += ((tx - k.cx) * 5 - k.vx * 3.2) * dt;
-      k.vy += ((ty - k.cy) * 5 - k.vy * 3.2) * dt;
+      k.vx += ((tx - k.cx) * 7 - k.vx * 4) * dt;
+      k.vy += ((ty - k.cy) * 7 - k.vy * 4) * dt;
       k.cx += k.vx * dt;
       k.cy += k.vy * dt;
     }
@@ -278,20 +296,19 @@ function wakeKin(w: World, index: number): void {
   w.emit('kin', k.x, k.y, w.kinAwake);
 }
 
-/** Effects of a Lumen Pulse on the environment. */
+/** What a Lumen Pulse does to the world around it. */
 export function pulseProps(w: World, x: number, y: number): void {
-  pulseFish(w, x, y);
-  const r2 = P.pulseRadius * P.pulseRadius;
+  pulseCombat(w, x, y);
+  const reach = 300 * (1 + 0.3 * w.load.pulseLevel);
+  const r2 = reach * reach;
   for (const pl of w.platforms) {
     if (pl.kind !== 'moonglass') continue;
     const nx = clamp(x, pl.x, pl.x + pl.w);
     if ((nx - x) * (nx - x) + (pl.y - y) * (pl.y - y) < r2) pl.litT = P.pulseReveal;
   }
-  for (const s of w.shells) {
-    if (!s.revealed && (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y) < r2) s.revealed = true;
-  }
+  for (const s of w.shells) if (!s.revealed && (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y) < r2) s.revealed = true;
   for (const g of w.gates) {
-    if (g.kind === 'bloom' && !g.open && (g.x - x) * (g.x - x) + (g.y - g.h / 2 - y) * (g.y - g.h / 2 - y) < 150 * 150) {
+    if (g.kind === 'bloom' && !g.open && (g.x - x) * (g.x - x) + (g.y - g.h / 2 - y) * (g.y - g.h / 2 - y) < 160 * 160) {
       g.open = true;
       g.prog = 1;
       w.emit('gateOpen', g.x, g.y - g.h / 2, 0);
@@ -299,6 +316,6 @@ export function pulseProps(w: World, x: number, y: number): void {
   }
   for (let i = 0; i < w.kin.length; i++) {
     const k = w.kin[i];
-    if (!k.awake && (k.x - x) * (k.x - x) + (k.y - y) * (k.y - y) < 210 * 210) wakeKin(w, i);
+    if (!k.awake && (k.x - x) * (k.x - x) + (k.y - y) * (k.y - y) < 220 * 220) wakeKin(w, i);
   }
 }

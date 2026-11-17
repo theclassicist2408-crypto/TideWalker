@@ -1,6 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
 import type { Palette } from '../../assets/data/palettes';
-import type { BiomeId } from '../core/types';
 import { hashString, makeRng } from '../core/util';
 import type { World } from '../core/world';
 import { OPEN_SKY, type Heightfield } from '../systems/terrain';
@@ -136,7 +135,6 @@ export class TerrainView {
   /** Scatters biome scenery along the ground: small things in front, large silhouettes behind. */
   private decorate(w: World, pal: Palette, index: number, back: Container, front: Container): void {
     const rng = makeRng(this.seed + index * 7919);
-    const biome: BiomeId = w.level.biome;
     const x0 = index * CHUNK;
     const gfx = this.gfx;
     let x = x0 + rng() * 30;
@@ -161,19 +159,19 @@ export class TerrainView {
           s.alpha = alpha;
           back.addChild(s);
         };
-        if (biome === 'storm') {
+        if (pal.style === 'stacks') {
           if (roll < 0.34) small('pebble', 0xffffff, 0.7 + rng() * 0.8);
           else if (roll < 0.58) small('grass', 0xb8c6f0, 0.8 + rng() * 0.5);
           else if (roll < 0.63 && !roofed) tall('wreck', 0.8 + rng() * 0.6, 0.85);
-        } else if (biome === 'pools') {
+        } else if (pal.style === 'hills') {
           if (roll < 0.4) small('grass', 0xd6e4ff, 0.8 + rng() * 0.6);
           else if (roll < 0.6) small('pebble', 0xdde6ff, 0.6 + rng() * 0.7);
           else if (roll < 0.7) small('coral', 0xbfd0ff, 0.6 + rng() * 0.4);
-        } else if (biome === 'kelp') {
+        } else if (pal.style === 'kelp') {
           if (roll < 0.3) small('grass', 0x8ff0c8, 0.8 + rng() * 0.7);
           else if (roll < 0.48) small('coral', 0x7fd8c0, 0.6 + rng() * 0.5);
           else if (roll < 0.8) tall('kelpBlade', 0.7 + rng() * 0.9, 0.55);
-        } else if (biome === 'ruins') {
+        } else if (pal.style === 'ruins') {
           if (roll < 0.24) small('pebble', 0xd8ccff, 0.7 + rng() * 0.9);
           else if (roll < 0.4) small('grass', 0xc0b4f0, 0.7 + rng() * 0.4);
           else if (roll < 0.53) tall('column', 0.6 + rng() * 0.6, 0.8);
@@ -186,7 +184,6 @@ export class TerrainView {
       }
       x += 22 + rng() * 46;
     }
-    void pal;
   }
 }
 

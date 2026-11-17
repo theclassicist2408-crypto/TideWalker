@@ -2,34 +2,34 @@ import { AudioDirector, type AudioInputs } from '../audio/director';
 import { AudioEngine } from '../audio/engine';
 import { Haptics } from '../effects/haptics';
 import { GameRenderer } from '../effects/renderer';
+import { bossDef } from '../entities/bosses';
 import { InputManager } from '../input/input';
-import { allChapters, CHAPTER_COUNT, getChapter } from '../levels';
-import { DAILY_LAYOUTS, getDailyLayout } from '../levels/daily';
+import { allAreas, areaCount, areaInfo, getLevel, getTutorial } from '../levels';
 import { makeDriftLevel, titleLevel } from '../levels/drift';
+import { fullLoadout } from '../levels/progress';
 import { browserStorage, SaveStore } from '../save/save';
-import { applyCondition, dailyFor, type DailyPick } from '../systems/daily';
 import { ROMAN } from '../ui/dom';
 import { Hud } from '../ui/hud';
-import { Ui, type ChapterInfo, type CompleteInfo, type UiHost } from '../ui/screens';
+import { Ui, type AreaView, type CompleteInfo, type Earned, type UiHost } from '../ui/screens';
 import { Bot } from './bot';
-import { FIXED_DT, P } from './constants';
+import { FIXED_DT, LEVELS_PER_AREA, REWARDS } from './constants';
 import { FixedLoop } from './loop';
+import { ABILITY_NAMES, UPGRADE_NAMES } from './names';
 import { newIntent, type GameEvent, type GameMode, type HintKind, type LevelData } from './types';
 import { clamp } from './util';
 import { World } from './world';
 
-type State = 'title' | 'playing' | 'paused' | 'failed' | 'complete';
+type State = 'title' | 'playing' | 'paused' | 'dead' | 'complete';
 
 interface Session {
   mode: GameMode;
-  chapter: number;
-  level: LevelData;
-  dailyKey: string;
-  tideScale: number;
-  drainScale: number;
+  area: number;
+  level: number;
+  data: LevelData;
 }
 
 const PX_PER_METRE = 20;
+const RESPAWN_AFTER = 0.9;
 
 /** Top-level coordinator: owns the loop and wires input, simulation, rendering, audio, UI and saves. */
 export class Game implements UiHost {
@@ -44,19 +44,21 @@ export class Game implements UiHost {
   ui!: Ui;
   world!: World;
   state: State = 'title';
-  private session: Session = { mode: 'title', chapter: 0, level: titleLevel(), dailyKey: '', tideScale: 1, drainScale: 1 };
+  private session: Session = { mode: 'title', area: 0, level: 0, data: titleLevel() };
   private readonly idle = newIntent();
-  private readonly audioIn: AudioInputs = { mode: 'title', biome: 'pools', danger: 0, tide: 0, lumen: 1, glow: 0, submerged: false, rain: 0, wind: 0, paused: false, menu: true };
+  private readonly audioIn: AudioInputs = { mode: 'title', biome: 'pools', danger: 0, tide: 0, lumen: 1, glow: 0, submerged: false, rain: 0, wind: 0, paused: false, menu: true, boss: false };
   private last = 0;
   private running = false;
   private raf = 0;
   private stateT = 0;
   private screenShown = false;
-  private pendingComplete: CompleteInfo | null = null;
+  private pending: CompleteInfo | null = null;
+  private earned: Earned[] = [];
   private driftBase = 0;
   private driftSeed = 1;
   private hintKind: HintKind | null = null;
   private hintT = 0;
+  private hintsSeen = new Set<HintKind>();
   private clock = 0;
   private readonly fade: HTMLElement;
   /** Verification bot; when set it plays instead of the player (automated playtests). */
@@ -76,31 +78,26 @@ export class Game implements UiHost {
 
   async start(): Promise<void> {
     await this.renderer.init(this.stage);
-    this.input = new InputManager(this.renderer.canvas);
+    this.hud = new Hud(this.hudRoot);
+    this.input = new InputManager(this.hud.pad);
     this.input.onFirstGesture = () => this.audio.unlock();
     this.input.onPauseKey = () => this.togglePause();
-    // Menus are DOM; any tap there must unlock audio too.
-    this.uiRoot.addEventListener('pointerdown', () => this.audio.unlock(), { passive: true });
-    this.hud = new Hud(this.hudRoot);
+    this.input.onCycle = () => this.cycleGift();
     this.hud.onPause = () => this.togglePause();
-    this.hud.onPulse = () => {
-      this.audio.unlock();
-      this.input.gestures.pressPulse();
-    };
+    this.hud.onCycle = () => this.cycleGift();
     this.ui = new Ui(this.uiRoot, this);
     this.renderer.onThunder = () => this.audio.thunder();
     this.settingsChanged();
-    this.loadWorld(this.session.level, 'title', -1);
+    this.loadWorld(this.session, -1);
     this.ui.show('title');
 
     // Browsers only allow sound after a user gesture, and may revoke it after an interruption.
-    for (const type of ['pointerup', 'touchend', 'click', 'keydown']) {
+    for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
       window.addEventListener(type, () => this.audio.unlock(), { passive: true });
     }
     const sideways = window.matchMedia('(orientation: landscape) and (max-height: 480px) and (pointer: coarse)');
     window.addEventListener('resize', () => {
       this.renderer.resize();
-      // A phone turned on its side shows the "turn upright" card; hold the game meanwhile.
       if (sideways.matches && this.state === 'playing' && !this.bot) this.pause();
     });
     window.addEventListener('orientationchange', () => window.setTimeout(() => this.renderer.resize(), 200));
@@ -111,32 +108,50 @@ export class Game implements UiHost {
 
   // ---- UiHost ----------------------------------------------------------------------------
 
-  chapters(): ChapterInfo[] {
-    return allChapters().map((l) => ({ index: l.index, name: l.name, line: l.line, shellIds: l.shells.map((s) => s.id), routeIds: l.secrets.map((s) => s.id) }));
+  areas(): AreaView[] {
+    return allAreas().map((a) => ({
+      index: a.index,
+      name: a.name,
+      line: a.line,
+      bossId: a.boss,
+      bossName: bossDef(a.boss).name,
+      levels: Array.from({ length: LEVELS_PER_AREA }, (_, i) => {
+        const l = getLevel(a.index, i + 1);
+        return { id: l.id, index: l.index, name: l.name, twist: l.twist, boss: l.arenas.some((x) => x.boss !== undefined) };
+      }),
+    }));
   }
 
-  daily(): DailyPick {
-    return dailyFor(new Date(), DAILY_LAYOUTS);
+  /** Begin, Continue, Onward: whatever comes next in the story. */
+  continueGame(): void {
+    const d = this.save.data;
+    if (!d.tutorialDone) return this.begin({ mode: 'tutorial', area: 0, level: 0, data: getTutorial() }, -1);
+    const cp = d.checkpoint;
+    if (cp) {
+      const m = /^a(\d{2})-(\d{2})$/.exec(cp.level);
+      if (m && this.save.isOpen(Number(m[1]), Number(m[2]))) return this.playLevel(Number(m[1]), Number(m[2]), cp.index);
+    }
+    const order = Math.min(d.unlocked, areaCount() * LEVELS_PER_AREA) - 1;
+    this.playLevel(Math.floor(order / LEVELS_PER_AREA) + 1, (order % LEVELS_PER_AREA) + 1);
   }
 
-  playChapter(index: number, resume: boolean): void {
-    const chapter = clamp(Math.round(index), 1, CHAPTER_COUNT);
-    const cp = this.save.data.checkpoint;
-    const from = resume && cp && cp.chapter === chapter ? cp.index : -1;
-    if (from < 0) this.save.clearCheckpoint();
-    this.begin({ mode: 'story', chapter, level: getChapter(chapter), dailyKey: '', tideScale: 1, drainScale: 1 }, from);
+  playLevel(area: number, level: number, checkpoint = -1): void {
+    const a = clamp(Math.round(area), 1, areaCount());
+    const n = clamp(Math.round(level), 1, LEVELS_PER_AREA);
+    if (checkpoint < 0) this.save.clearCheckpoint();
+    this.begin({ mode: 'story', area: a, level: n, data: getLevel(a, n) }, checkpoint);
   }
 
-  playDaily(): void {
-    const pick = this.daily();
-    const level = applyCondition(getDailyLayout(pick.layout), pick.condition);
-    this.begin({ mode: 'daily', chapter: 0, level, dailyKey: pick.key, tideScale: pick.condition.tideScale, drainScale: pick.condition.drainScale }, -1);
+  /** Fights an area's boss again, starting at the lantern outside its arena. */
+  playRematch(area: number): void {
+    const data = getLevel(area, LEVELS_PER_AREA);
+    this.begin({ mode: 'rematch', area, level: LEVELS_PER_AREA, data }, data.checkpoints.length - 1);
   }
 
   playDrift(): void {
     this.driftBase = 0;
     this.driftSeed = 1 + Math.floor(Math.random() * 100000);
-    this.begin({ mode: 'drift', chapter: 0, level: makeDriftLevel(this.driftSeed), dailyKey: '', tideScale: 1, drainScale: 1 }, -1);
+    this.begin({ mode: 'drift', area: 0, level: 0, data: makeDriftLevel(this.driftSeed) }, -1);
   }
 
   resume(): void {
@@ -148,9 +163,8 @@ export class Game implements UiHost {
     this.loop.reset();
   }
 
-  /** Back to the last lantern (from the retry screen or the pause menu). */
-  retry(): void {
-    if (this.state !== 'failed' && this.state !== 'paused') return;
+  toLantern(): void {
+    if (this.state !== 'paused' && this.state !== 'dead') return;
     this.world.respawn();
     if (this.bot) this.bot = new Bot(this.world, true);
     this.ui.clear();
@@ -161,25 +175,26 @@ export class Game implements UiHost {
     this.loop.reset();
   }
 
-  restartChapter(): void {
+  restartLevel(): void {
     const s = this.session;
-    if (s.mode === 'story') this.save.clearCheckpoint();
-    if (s.mode === 'drift') this.playDrift();
-    else this.begin(s, -1);
+    if (s.mode === 'drift') return this.playDrift();
+    if (s.mode === 'rematch') return this.playRematch(s.area);
+    this.save.clearCheckpoint();
+    this.begin(s, -1);
   }
 
-  quitToTitle(then?: 'chapters'): void {
+  quitToTitle(then?: 'areas'): void {
     this.recordDrift();
     this.fadeThrough(() => {
       this.bot = null;
-      this.session = { mode: 'title', chapter: 0, level: titleLevel(), dailyKey: '', tideScale: 1, drainScale: 1 };
-      this.loadWorld(this.session.level, 'title', -1);
+      this.session = { mode: 'title', area: 0, level: 0, data: titleLevel() };
+      this.loadWorld(this.session, -1);
       this.input.setEnabled(false);
       this.hud.setVisible(false);
       this.hud.hideCard();
       this.setState('title');
       this.ui.show('title');
-      if (then) this.ui.push(then);
+      if (then && this.save.data.tutorialDone) this.ui.push(then);
     });
   }
 
@@ -206,34 +221,43 @@ export class Game implements UiHost {
   private begin(session: Session, checkpoint: number): void {
     this.fadeThrough(() => {
       this.session = session;
-      this.loadWorld(session.level, session.mode, checkpoint);
+      this.earned = [];
+      this.loadWorld(session, checkpoint);
       this.ui.clear();
       this.input.setEnabled(true);
-      this.hud.setMode(session.mode === 'drift' ? 'drift' : session.mode === 'daily' ? 'daily' : 'story');
+      this.hud.setMode(session.mode === 'drift' ? 'drift' : 'story');
       this.refreshShells();
       this.hud.setVisible(true);
-      if (session.mode === 'story') this.hud.showCard(ROMAN[session.chapter - 1], session.level.name, session.level.line);
-      else if (session.mode === 'daily') this.hud.showCard('Daily Tide', session.level.name, session.level.line);
+      const d = session.data;
+      if (session.mode === 'story') this.hud.showCard(`${ROMAN[session.area - 1]} · ${session.level}  ${areaInfo(session.area).name}`, d.name, d.twist);
+      else if (session.mode === 'tutorial') this.hud.showCard('Before the fall', d.name, d.line);
+      else if (session.mode === 'rematch') this.hud.showCard('Rematch', bossDef(areaInfo(session.area).boss).name, d.name);
       else if (this.driftBase === 0) this.hud.showCard('Drift', 'The quiet shore', 'Nowhere to be.');
       this.setState('playing');
     });
   }
 
-  private loadWorld(level: LevelData, mode: GameMode, checkpoint: number): void {
-    this.world = new World(level, {
-      difficulty: this.save.data.settings.difficulty,
-      mode,
-      ownedShells: new Set(this.save.data.shells),
+  private loadWorld(session: Session, checkpoint: number): void {
+    const d = this.save.data;
+    const free = session.mode === 'tutorial' || session.mode === 'drift' || session.mode === 'title';
+    this.world = new World(session.data, {
+      difficulty: d.settings.difficulty,
+      mode: session.mode,
+      loadout: free ? fullLoadout() : this.save.loadout(),
+      ownedShells: new Set(d.shells),
+      defeated: new Set(d.defeated),
+      taken: new Set(d.grants),
       startCheckpoint: checkpoint,
-      tideScale: this.session.tideScale,
-      drainScale: this.session.drainScale,
     });
     this.renderer.setWorld(this.world);
-    this.audio.setBiome(level.biome);
+    this.audio.setBiome(session.data.biome);
     this.input?.reset();
     this.loop.reset();
     this.hintKind = null;
+    this.hintsSeen.clear();
     this.hud?.setHint(null, false);
+    this.hud?.setBoss(null, 0);
+    this.hud?.setTimer(null);
     if (this.bot) this.bot = new Bot(this.world, true);
   }
 
@@ -247,8 +271,8 @@ export class Game implements UiHost {
     this.fade.classList.add('on');
     window.setTimeout(() => {
       fn();
-      window.setTimeout(() => this.fade.classList.remove('on'), 60);
-    }, 320);
+      window.setTimeout(() => this.fade.classList.remove('on'), 50);
+    }, 220);
   }
 
   private togglePause(): void {
@@ -263,7 +287,16 @@ export class Game implements UiHost {
     this.hud.setVisible(false);
     this.recordDrift();
     const s = this.session;
-    this.ui.show('pause', { mode: s.mode, title: s.mode === 'drift' ? 'Drift' : s.level.name });
+    this.ui.show('pause', { mode: s.mode, title: s.mode === 'drift' ? 'Drift' : s.data.name, twist: s.mode === 'story' ? s.data.twist : '' });
+  }
+
+  private cycleGift(): void {
+    if (this.state !== 'playing' || this.session.mode === 'tutorial' || this.session.mode === 'drift') return;
+    const next = this.save.cycleReward();
+    if (!next) return;
+    this.world.load.equipped = next;
+    this.hud.showNote(REWARDS[next].name, 'pulse');
+    this.audio.ui('toggle');
   }
 
   private refreshShells(): void {
@@ -285,27 +318,29 @@ export class Game implements UiHost {
     this.setState('complete');
     this.input.setEnabled(false);
     this.director.triggerRelief(1);
-    if (s.mode === 'daily') {
-      const newBest = this.save.completeDaily(s.dailyKey, w.time);
-      const d = this.save.data.daily;
-      this.pendingComplete = { mode: 'daily', index: 0, name: s.level.name, time: w.time, best: d.bestTimes[s.dailyKey] ?? null, newBest, shellIds: [], routesFound: 0, routesTotal: 0, kin: w.kinAwake, streak: d.streak, last: false };
+    if (s.mode === 'tutorial') {
+      this.save.completeTutorial();
+      this.pending = null;
       return;
     }
-    const newBest = this.save.completeChapter(s.chapter, w.time, [...w.secretsFound]);
-    const rec = this.save.chapter(s.chapter);
-    this.pendingComplete = {
-      mode: 'story',
-      index: s.chapter,
-      name: s.level.name,
+    if (s.mode === 'rematch') {
+      this.pending = { area: 0, level: 0, name: bossDef(areaInfo(s.area).boss).name, time: w.time, best: null, newBest: false, deaths: w.totalFails, shellIds: [], earned: [], next: 'map' };
+      return;
+    }
+    const newBest = this.save.completeLevel(s.data.id, s.area, s.level, w.time, [...w.secretsFound]);
+    const lastLevel = s.level === LEVELS_PER_AREA;
+    const lastArea = s.area === areaCount();
+    this.pending = {
+      area: s.area,
+      level: s.level,
+      name: s.data.name,
       time: w.time,
-      best: rec.bestTime,
+      best: this.save.level(s.data.id).bestTime,
       newBest,
-      shellIds: s.level.shells.map((x) => x.id),
-      routesFound: rec.routes.filter((r) => s.level.secrets.some((z) => z.id === r)).length,
-      routesTotal: s.level.secrets.length,
-      kin: w.kinAwake,
-      streak: 0,
-      last: s.chapter === CHAPTER_COUNT,
+      deaths: w.totalFails,
+      shellIds: s.data.shells.map((x) => x.id),
+      earned: this.earned,
+      next: lastLevel && lastArea ? 'ending' : lastLevel ? 'area' : 'level',
     };
   }
 
@@ -347,9 +382,14 @@ export class Game implements UiHost {
       const w = this.world;
       const steps = this.loop.advance(dt) * this.debugSpeed;
       for (let i = 0; i < steps; i++) {
+        // A landed blow freezes the world for a few frames: the hit is felt before it resolves.
+        if (w.hitstop > 0) {
+          w.hitstop -= FIXED_DT;
+          continue;
+        }
         const intent = this.state === 'playing' ? (this.bot ? this.bot.update(FIXED_DT) : this.input.read(now)) : this.idle;
         w.step(intent, FIXED_DT);
-        if (w.status === 'failed' && this.state === 'playing') this.setState('failed');
+        if (w.status === 'failed' && this.state === 'playing') this.setState('dead');
         if (w.status === 'complete') break;
       }
       for (let i = 0; i < w.eventCount; i++) this.onEvent(w.events[i]);
@@ -364,55 +404,56 @@ export class Game implements UiHost {
   private afterStep(dt: number): void {
     const w = this.world;
     const p = w.player;
-    if (this.state === 'failed') {
-      if (this.bot && this.stateT > 1.1) this.retry();
-      else if (!this.screenShown && this.stateT > 1.15) {
-        this.screenShown = true;
-        this.hud.setVisible(false);
-        this.input.setEnabled(false);
-        this.ui.show('retry', { kind: p.status === 'swept' ? 'swept' : 'caught', assist: w.failsHere >= 3 });
-      }
+    if (this.state === 'dead') {
+      // No retry screen: the lantern takes you back at once, so the lesson is still fresh.
+      if (this.stateT > RESPAWN_AFTER) this.toLantern();
       return;
     }
     if (this.state === 'complete') {
-      if (!this.screenShown && this.stateT > 1.5 && this.pendingComplete) {
+      if (!this.screenShown && this.stateT > 1.2) {
         this.screenShown = true;
         this.hud.setVisible(false);
-        this.ui.show('complete', this.pendingComplete);
-        this.pendingComplete = null;
+        if (this.session.mode === 'tutorial') this.ui.show('fall');
+        else if (this.pending) this.ui.show('complete', this.pending);
+        this.pending = null;
       }
       return;
     }
     if (this.state !== 'playing') return;
 
-    this.hud.update(w.lumenFrac, w.tide.progress, 1 - p.pulseCd / P.pulseCooldown, p.danger, p.fadeT > 0, p.glowOn);
+    const drift = this.session.mode === 'drift';
+    this.hud.update(p.hp, w.load.hpMax, w.lumenFrac, p.essence, w.load.essenceMax, p.healT > 0, p.danger);
+    const b = w.boss;
+    this.hud.setBoss(b && b.mode !== 'dead' ? b.def.name : null, b ? b.hp / b.hpMax : 0);
+    this.hud.setTimer(w.level.rules.timeLimit ? w.timeLeft : null);
+    const gift = !drift && this.session.mode !== 'tutorial' ? w.load.equipped : null;
+    this.hud.setGift(gift ? REWARDS[gift].name : null, p.abilityCd <= 0 && p.lumen >= (gift ? REWARDS[gift].cost : 0));
     this.haptics.danger(p.danger, this.clock);
     this.updateHints(dt);
 
-    if (this.session.mode === 'drift') {
+    if (drift) {
       this.hud.setDistance(this.driftDistance());
       if (p.x > w.level.goalX - 500) {
-        // The shore goes on: carry the distance into a freshly generated stretch.
         this.driftBase = this.driftDistance();
         this.save.recordDrift(this.driftBase);
         this.driftSeed++;
         this.setState('complete');
-        this.begin({ ...this.session, level: makeDriftLevel(this.driftSeed) }, -1);
+        this.begin({ ...this.session, data: makeDriftLevel(this.driftSeed) }, -1);
       }
     }
   }
 
-  /** Gesture hints: shown inside authored zones until the player performs the action once. */
+  /** Prompts: shown inside authored zones until the player has done the thing. */
   private updateHints(dt: number): void {
     const w = this.world;
     const p = w.player;
-    const done = this.save.data.tutorial;
+    const tutorial = this.session.mode === 'tutorial';
     let kind: HintKind | null = null;
     for (const hint of w.level.hints) {
-      if (p.x >= hint.x && p.x <= hint.x + hint.w && !done[hint.kind]) {
-        kind = hint.kind;
-        break;
-      }
+      if (p.x < hint.x || p.x > hint.x + hint.w) continue;
+      if (this.hintsSeen.has(hint.kind) || (!tutorial && this.save.data.hints[hint.kind])) continue;
+      kind = hint.kind;
+      break;
     }
     if (kind !== this.hintKind) {
       this.hintKind = kind;
@@ -421,34 +462,62 @@ export class Game implements UiHost {
     }
     if (!kind) return;
     this.hintT += dt;
-    const performed =
-      (kind === 'move' && Math.abs(p.vx) > 70) ||
+    const timed = kind === 'danger' || kind === 'pause' || kind === 'bench' || kind === 'boss' || kind === 'rematch' || kind === 'ability';
+    const done =
+      (kind === 'move' && Math.abs(p.vx) > 120) ||
+      (kind === 'swim' && p.swim && this.hintT > 1) ||
+      (kind === 'dive' && p.swim && p.y > w.waterY + 40) ||
+      (kind === 'glide' && p.gliding && this.hintT > 0.4) ||
       (kind === 'glow' && p.glow > 0.95) ||
-      (kind === 'dive' && p.swim && p.vy > 40) ||
-      (kind === 'hide' && p.hidden) ||
-      (kind === 'stop' && p.onGround && Math.abs(p.vx) < 5 && this.hintT > 0.5);
-    if (performed) this.completeHint(kind);
+      (timed && this.hintT > 4.5);
+    if (done) this.completeHint(kind);
   }
 
   private completeHint(kind: HintKind): void {
     if (this.hintKind !== kind) return;
-    this.save.markTutorial(kind);
+    this.hintsSeen.add(kind);
+    if (this.session.mode !== 'tutorial') this.save.markHint(kind);
     this.hintKind = null;
     this.hud.setHint(null, false);
   }
 
   private onEvent(e: GameEvent): void {
     const w = this.world;
+    const p = w.player;
     const cam = this.renderer.camera;
     this.renderer.onEvent(e);
     const dx = e.x - cam.x;
     const dist = Math.hypot(dx, e.y - cam.y);
     this.audio.play(e.type, clamp(dx / 260, -1, 1), 1 / (1 + (dist / 320) * (dist / 320)), e.v);
     if (w.mode === 'title') return;
+    const story = this.session.mode === 'story';
 
     switch (e.type) {
       case 'jump':
         this.completeHint('jump');
+        break;
+      case 'doubleJump':
+        this.completeHint('double');
+        break;
+      case 'wallJump':
+        this.completeHint('wall');
+        break;
+      case 'dash':
+        this.completeHint(p.onGround ? 'dash' : 'airdash');
+        if (!p.onGround) this.completeHint('dash');
+        break;
+      case 'slash':
+        this.completeHint('attack');
+        break;
+      case 'pogo':
+        this.completeHint('downstrike');
+        break;
+      case 'chargeSlash':
+        this.completeHint('charge');
+        break;
+      case 'pulse':
+        this.haptics.play('pulse');
+        this.completeHint('pulse');
         break;
       case 'land':
         this.haptics.play(e.v > 520 ? 'hardLand' : 'land');
@@ -456,35 +525,24 @@ export class Game implements UiHost {
       case 'glowOn':
         this.haptics.play('glow');
         break;
-      case 'pulse':
-        this.haptics.play('pulse');
-        this.completeHint('pulse');
-        break;
-      case 'dash':
-        this.completeHint('dash');
-        break;
-      case 'sting':
-        this.haptics.play('sting');
-        break;
-      case 'bite':
-        this.haptics.play('bite');
-        break;
-      case 'nearMiss':
-        this.haptics.play('nearMiss');
-        this.director.triggerRelief(0.5);
-        break;
-      case 'caught':
-      case 'swept':
-        this.haptics.play('caught');
-        break;
+      case 'hit':
       case 'pickup':
       case 'plant':
-      case 'kin':
         this.haptics.play('pickup');
+        break;
+      case 'hurt':
+        this.haptics.play('bite');
+        break;
+      case 'death':
+        this.haptics.play('caught');
+        break;
+      case 'heal':
+        this.haptics.play('checkpoint');
+        this.completeHint('heal');
         break;
       case 'shell': {
         const shell = w.shells[e.v];
-        if (shell && this.session.mode === 'story') {
+        if (shell && story) {
           const fresh = this.save.addShell(shell.id);
           this.hud.showNote(fresh ? 'A memory, kept' : 'A memory you already hold', 'shell');
         }
@@ -495,15 +553,51 @@ export class Game implements UiHost {
         break;
       }
       case 'checkpoint':
-        if (this.session.mode === 'story') this.save.setCheckpoint(this.session.chapter, e.v);
+        if (story) this.save.setCheckpoint(this.session.data.id, e.v);
         this.haptics.play('checkpoint');
         this.director.triggerRelief(0.6);
+        this.completeHint('bench');
         break;
+      case 'grant': {
+        const g = w.grants[e.v];
+        if (!g) break;
+        const [title, line] = g.ability ? ABILITY_NAMES[g.ability] : UPGRADE_NAMES[g.upgrade ?? 'health'];
+        if (story && this.save.takeGrant(`${this.session.data.id}:${e.v}`, g)) this.earned.push({ title, line });
+        this.hud.showNote(g.ability ? `${title} returns` : title, 'pulse');
+        this.haptics.play('shell');
+        this.director.triggerRelief(1);
+        this.audio.relief(1);
+        break;
+      }
+      case 'bossIntro':
+        this.haptics.play('danger');
+        break;
+      case 'minibossDown':
+      case 'bossDown': {
+        const a = w.arenas[e.v];
+        const id = a ? (a.boss ?? a.miniboss) : undefined;
+        if (!id) break;
+        const def = bossDef(id);
+        this.haptics.play('shell');
+        this.director.triggerRelief(1);
+        this.audio.relief(1);
+        if (!story) break;
+        this.save.defeat(id, def.reward);
+        if (def.reward) {
+          // The gift is usable at once, and equipped.
+          w.load.rewards.add(def.reward);
+          w.load.equipped = def.reward;
+          const r = REWARDS[def.reward];
+          this.earned.push({ title: r.name, line: r.line });
+          this.hud.showNote(`${r.name} is yours`, 'pulse');
+        }
+        break;
+      }
       case 'secret':
         this.hud.showNote('A hidden way', 'route');
         break;
       case 'assist':
-        this.hud.showNote('A gentler way is glowing', 'pulse');
+        this.hud.showNote('The deep relents a little', 'pulse');
         break;
       case 'goal':
         this.haptics.play('checkpoint');
@@ -530,6 +624,7 @@ export class Game implements UiHost {
     a.wind = w.level.weather.wind;
     a.paused = frozen;
     a.menu = this.state === 'title' || this.ui.active !== null;
+    a.boss = w.boss !== null && w.boss.mode !== 'dead';
     this.audio.update(this.director.update(a, dt));
   }
 }

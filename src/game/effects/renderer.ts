@@ -9,7 +9,7 @@ import { OPEN_SKY } from '../systems/terrain';
 import { Background } from './background';
 import { CreatureView } from './creatureView';
 import { EntityLayer } from './entityViews';
-import { FishView } from './fishView';
+import { CombatLayer } from './combatView';
 import { Gfx, mixColor } from './gfx';
 import { Lightmap } from './lightmap';
 import { ParticleLayer } from './particles';
@@ -27,7 +27,6 @@ const RAIN = 120;
 export class GameRenderer {
   readonly app = new Application();
   readonly camera = new Camera();
-  private gfx!: Gfx;
   private background!: Background;
   private terrain!: TerrainView;
   private water = new WaterView();
@@ -38,10 +37,8 @@ export class GameRenderer {
   private sparks!: ParticleLayer;
   private bubbles!: ParticleLayer;
   private readonly worldC = new Container();
-  private readonly fishLayer = new Container();
-  private readonly fishGlow = new Container();
   private readonly overlay = new Container();
-  private fishViews: FishView[] = [];
+  private combat!: CombatLayer;
   private rain: Sprite[] = [];
   private rainSeed: Float32Array = new Float32Array(RAIN * 3);
   private vignette!: Sprite;
@@ -83,30 +80,33 @@ export class GameRenderer {
     this.app.canvas.classList.add('game-canvas');
     parent.prepend(this.app.canvas);
 
-    const gfx = (this.gfx = new Gfx());
+    const gfx = new Gfx();
     this.background = new Background(gfx);
     this.terrain = new TerrainView(gfx);
     this.entities = new EntityLayer(gfx);
     this.creature = new CreatureView(gfx);
+    this.combat = new CombatLayer(gfx);
     this.lightmap = new Lightmap(gfx);
     this.motes = new ParticleLayer(gfx, 220, false);
     this.sparks = new ParticleLayer(gfx, 260, true);
     this.bubbles = new ParticleLayer(gfx, 160, false);
 
     const glow = new Container();
-    glow.addChild(this.entities.glow, this.fishGlow, this.creature.halo, this.sparks.container);
+    glow.addChild(this.entities.glow, this.combat.glow, this.creature.halo, this.sparks.container);
     this.worldC.addChild(
       this.terrain.back,
       this.water.g,
       this.entities.back,
       this.terrain.ground,
       this.terrain.front,
-      this.fishLayer,
+      this.combat.back,
       this.entities.mid,
+      this.combat.mid,
       this.creature.root,
       this.entities.front,
       this.motes.container,
       this.bubbles.container,
+      this.combat.zones,
       glow,
     );
 
@@ -163,7 +163,7 @@ export class GameRenderer {
     this.background.setBiome(w.level.biome, w.level.weather);
     this.terrain.reset(w.level.id + w.mode);
     this.entities.sync(w);
-    this.syncFish(w);
+    this.combat.setWorld(w, this.pal);
     this.motes.clear();
     this.sparks.clear();
     this.bubbles.clear();
@@ -172,20 +172,6 @@ export class GameRenderer {
     this.flash = 0;
     this.nextBolt = 4 + Math.random() * 6;
     this.cave = 0;
-  }
-
-  private syncFish(w: World): void {
-    if (this.fishViews.length === w.fish.length && this.fishViews.every((v, i) => v.fish === w.fish[i])) return;
-    for (const v of this.fishViews) {
-      v.root.destroy({ children: true });
-      v.glow.destroy({ children: true });
-    }
-    this.fishViews = w.fish.map((f) => {
-      const v = new FishView(this.gfx, f);
-      this.fishLayer.addChild(v.root);
-      this.fishGlow.addChild(v.glow);
-      return v;
-    });
   }
 
   /** Camera snap after a respawn or resume. */
@@ -232,8 +218,7 @@ export class GameRenderer {
       case 'pulse':
         cr.squash(1.4, 1.4);
         sp.spawn({ frame: 'ring', x, y, ttl: 0.7, s0: 30, s1: P.pulseRadius * 2, alpha: 0.85, tint: LIGHT.creatureCore });
-        sp.spawn({ frame: 'ring', x, y, ttl: 0.5, s0: 20, s1: P.pulsePush * 2, alpha: 0.6, tint: LIGHT.creatureWarm });
-        sp.spawn({ frame: 'soft', x, y, ttl: 0.45, s0: 80, s1: 420, alpha: 0.5, tint: LIGHT.creatureWarm });
+                sp.spawn({ frame: 'soft', x, y, ttl: 0.45, s0: 80, s1: 420, alpha: 0.5, tint: LIGHT.creatureWarm });
         for (let i = 0; i < 14; i++) {
           const a = (i / 14) * Math.PI * 2;
           sp.spawn({ frame: 'spark', x, y, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, drag: 2.4, ttl: 0.7, s0: 12, s1: 3, alpha: 0.9, tint: LIGHT.creatureCore, spin: 3 });
@@ -247,22 +232,83 @@ export class GameRenderer {
         cr.squash(1.35, 0.72);
         for (let i = 0; i < 5; i++) sp.spawn({ frame: 'streak', x: x - v * i * 5, y: y + (rnd() - 0.5) * 10, vx: -v * 60, ttl: 0.3, s0: 6, s1: 6, alpha: 0.6, tint: LIGHT.creatureWarm, rotation: Math.PI / 2 });
         break;
-      case 'sting':
-        cr.squash(0.75, 1.25);
-        for (let i = 0; i < 8; i++) sp.spawn({ frame: 'spark', x, y, vx: (rnd() - 0.5) * 220, vy: (rnd() - 0.5) * 220, drag: 3, ttl: 0.5, s0: 9, s1: 2, alpha: 0.9, tint: LIGHT.dangerEye });
-        cam.shake(0.28);
+      case 'slash':
+      case 'chargeSlash': {
+        const p = this.world?.player;
+        if (!p) break;
+        const big = e.type === 'chargeSlash';
+        const rot = v === 1 ? -Math.PI / 2 : v === 2 ? Math.PI / 2 : p.facing > 0 ? 0 : Math.PI;
+        const reach = big ? 60 : 34;
+        sp.spawn({ frame: 'slash', x: x + Math.cos(rot) * reach * 0.6, y: y + Math.sin(rot) * reach * 0.6, ttl: big ? 0.24 : 0.14, s0: big ? 96 : 60, s1: big ? 120 : 70, alpha: 0.95, tint: big ? LIGHT.creatureWarm : LIGHT.blade, rotation: rot });
+        if (big) cam.shake(0.18);
         break;
-      case 'bite':
+      }
+      case 'chargeReady':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.3, s0: 60, s1: 16, alpha: 0.8, tint: LIGHT.creatureWarm });
+        break;
+      case 'hit':
+        for (let i = 0; i < 5; i++) sp.spawn({ frame: 'spark', x, y, vx: (rnd() - 0.5) * 260, vy: (rnd() - 0.5) * 260, drag: 4, ttl: 0.28, s0: 10, s1: 2, alpha: 0.95, tint: 0xffffff });
+        break;
+      case 'clang':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.22, s0: 8, s1: 46, alpha: 0.9, tint: 0xcfd8ff });
+        break;
+      case 'pogo':
+        cr.squash(0.8, 1.25);
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.25, s0: 8, s1: 50, alpha: 0.7, tint: LIGHT.blade, flat: 0.4 });
+        break;
+      case 'kill':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.4, s0: 10, s1: 90, alpha: 0.7, tint: LIGHT.dangerEye });
+        for (let i = 0; i < 12; i++) sp.spawn({ frame: 'dot', x, y, vx: (rnd() - 0.5) * 300, vy: (rnd() - 0.5) * 300, drag: 3, ttl: 0.6, s0: 7, s1: 1, alpha: 0.9, tint: i % 2 ? LIGHT.dangerEye : LIGHT.creatureWarm });
+        cam.shake(0.12);
+        break;
+      case 'hurt':
         cr.squash(0.7, 1.3);
-        sp.spawn({ frame: 'ring', x, y, ttl: 0.45, s0: 10, s1: 120, alpha: 0.7, tint: LIGHT.danger });
-        for (let i = 0; i < 12; i++) sp.spawn({ frame: 'dot', x, y, vx: (rnd() - 0.5) * 260, vy: (rnd() - 0.5) * 260, drag: 2.6, ttl: 0.7, s0: 6, s1: 1, alpha: 0.9, tint: LIGHT.creatureWarm });
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.4, s0: 10, s1: 130, alpha: 0.8, tint: LIGHT.danger });
+        for (let i = 0; i < 10; i++) sp.spawn({ frame: 'dot', x, y, vx: (rnd() - 0.5) * 260, vy: (rnd() - 0.5) * 260, drag: 2.6, ttl: 0.6, s0: 6, s1: 1, alpha: 0.9, tint: LIGHT.creatureWarm });
+        cam.shake(0.45);
+        break;
+      case 'death':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.9, s0: 20, s1: 240, alpha: 0.6, tint: LIGHT.danger });
+        for (let i = 0; i < 18; i++) sp.spawn({ frame: 'dot', x, y, vx: (rnd() - 0.5) * 200, vy: -20 - rnd() * 120, drag: 1.2, ttl: 1.1, s0: 6, s1: 1, alpha: 0.9, tint: LIGHT.creatureWarm });
         cam.shake(0.5);
         break;
-      case 'caught':
-      case 'swept':
-        sp.spawn({ frame: 'ring', x, y, ttl: 1.1, s0: 20, s1: 220, alpha: 0.5, tint: e.type === 'caught' ? LIGHT.danger : this.pal.surface });
-        for (let i = 0; i < 16; i++) sp.spawn({ frame: 'dot', x, y, vx: (rnd() - 0.5) * 120, vy: -20 - rnd() * 70, drag: 1.2, ttl: 1.4, s0: 5, s1: 1, alpha: 0.8, tint: LIGHT.creatureWarm });
-        cam.shake(0.35);
+      case 'heal':
+      case 'grant':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.6, s0: 14, s1: e.type === 'grant' ? 220 : 110, alpha: 0.8, tint: LIGHT.plant });
+        for (let i = 0; i < 12; i++) sp.spawn({ frame: 'spark', x: x + (rnd() - 0.5) * 20, y, vx: (rnd() - 0.5) * 60, vy: -40 - rnd() * 90, drag: 1.5, ttl: 0.9, s0: 10, s1: 2, alpha: 0.9, tint: LIGHT.plant, spin: 2 });
+        break;
+      case 'ability':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.4, s0: 16, s1: 130, alpha: 0.7, tint: LIGHT.safeCurrent });
+        break;
+      case 'doubleJump':
+      case 'wallJump':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.25, s0: 8, s1: 44, alpha: 0.6, tint: LIGHT.blade, flat: e.type === 'doubleJump' ? 0.35 : 1 });
+        cr.squash(0.78, 1.26);
+        break;
+      case 'break':
+        for (let i = 0; i < 14; i++) mo.spawn({ x: x + (rnd() - 0.5) * 30, y: y + (rnd() - 0.5) * 100, vx: (rnd() - 0.5) * 220, vy: -60 - rnd() * 120, gravity: 700, ttl: 0.8, s0: 7, s1: 3, alpha: 0.9, tint: 0xd8c0b0 });
+        cam.shake(0.3);
+        break;
+      case 'zoneHit':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.3, s0: 20, s1: v === 2 ? 180 : 90, alpha: 0.7, tint: 0xffd0f4, flat: v === 2 ? 0.3 : 1 });
+        if (v === 2) cam.shake(0.3);
+        break;
+      case 'enemyWindup':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.4, s0: v > 0 ? 150 : 70, s1: 12, alpha: 0.8, tint: LIGHT.dangerEye });
+        break;
+      case 'spawn':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.5, s0: 60, s1: 10, alpha: 0.7, tint: LIGHT.danger });
+        break;
+      case 'bossIntro':
+      case 'bossPhase':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.9, s0: 30, s1: 420, alpha: 0.8, tint: LIGHT.dangerEye });
+        cam.shake(0.6);
+        break;
+      case 'bossDown':
+      case 'minibossDown':
+        for (let k = 0; k < 3; k++) sp.spawn({ frame: 'ring', x, y, ttl: 0.8 + k * 0.3, s0: 30, s1: 360 + k * 120, alpha: 0.8, tint: LIGHT.creatureWarm });
+        for (let i = 0; i < 30; i++) sp.spawn({ frame: 'spark', x, y, vx: (rnd() - 0.5) * 420, vy: (rnd() - 0.5) * 420, drag: 1.6, ttl: 1.4, s0: 16, s1: 2, alpha: 1, tint: i % 2 ? LIGHT.creatureWarm : LIGHT.dangerEye, spin: 3 });
+        cam.shake(0.8);
         break;
       case 'pickup':
         for (let i = 0; i < 6; i++) sp.spawn({ frame: 'dot', x, y, vx: (rnd() - 0.5) * 90, vy: -30 - rnd() * 70, drag: 2, ttl: 0.6, s0: 5, s1: 1, alpha: 0.9, tint: LIGHT.firefly });
@@ -296,24 +342,6 @@ export class GameRenderer {
         for (let i = 0; i < 7; i++) mo.spawn({ x: x + (rnd() - 0.5) * 40, y, vx: (rnd() - 0.5) * 60, vy: -20 - rnd() * 40, gravity: 500, ttl: 0.7, s0: 5, s1: 3, alpha: 0.7, tint: 0xb9aee0 });
         if (this.world && Math.abs(this.world.player.x - x) < 200) cam.shake(0.16);
         break;
-      case 'fishAlert':
-        sp.spawn({ frame: 'ring', x, y, ttl: 0.6, s0: 10, s1: 70, alpha: 0.5, tint: LIGHT.dangerEye });
-        break;
-      case 'fishWindup':
-        sp.spawn({ frame: 'ring', x, y, ttl: 0.5, s0: 110, s1: 14, alpha: 0.75, tint: LIGHT.dangerEye });
-        break;
-      case 'fishLunge':
-        for (let i = 0; i < 5; i++) this.bubbles.spawn({ frame: 'bubble', x: x + (rnd() - 0.5) * 20, y: y + (rnd() - 0.5) * 12, vy: -30 - rnd() * 30, ttl: 0.8, s0: 4, s1: 8, alpha: 0.6 });
-        break;
-      case 'fishRipple':
-        mo.spawn({ frame: 'ring', x, y, ttl: 1.6, s0: 6, s1: v > 1 ? 120 : 54, alpha: v > 1 ? 0.5 : 0.3, tint: mixColor(this.pal.surface, LIGHT.dangerEye, 0.35), flat: 0.24 });
-        if (rnd() < 0.5) this.bubbles.spawn({ frame: 'bubble', x: x + (rnd() - 0.5) * 20, y: y + 10, vy: -12, ttl: 0.9, s0: 3, s1: 6, alpha: 0.5 });
-        break;
-      case 'nearMiss':
-        cr.squash(0.8, 1.22);
-        sp.spawn({ frame: 'ring', x, y, ttl: 0.35, s0: 20, s1: 90, alpha: 0.6, tint: 0xffffff });
-        cam.shake(0.15);
-        break;
       case 'stoneWarn':
         for (let i = 0; i < 4; i++) mo.spawn({ x: x + (rnd() - 0.5) * 18, y: y + 12, vy: 30 + rnd() * 30, gravity: 300, ttl: 0.6, s0: 3, s1: 1, alpha: 0.7, tint: 0xcabfff });
         break;
@@ -338,7 +366,6 @@ export class GameRenderer {
     this.motes.density = this.sparks.density = this.bubbles.density = this.options.reducedMotion ? 0.5 : 1;
 
     this.entities.sync(w);
-    this.syncFish(w);
     this.creature.update(w, alpha, step);
     if (!frozen) cam.update(this.creature.x, this.creature.y, p.vx, p.facing, dt, w.minX - 10, w.level.width);
 
@@ -355,22 +382,9 @@ export class GameRenderer {
     this.entities.update(w, this.pal, t, step, left, right, this.lightmap, this.sparks, this.bubbles, calm);
 
     const radius = w.lightRadius;
-    let near = 0;
-    let nearSide = 0;
-    for (let i = 0; i < this.fishViews.length; i++) {
-      const v = this.fishViews[i];
-      v.update(w, alpha, step, radius);
-      const f = v.fish;
-      if (f.mode === 'dormant') continue;
-      if (f.kind === 'angler' && f.mode === 'patrol') this.lightmap.add(v.lureX, v.lureY, 52, LIGHT.lure, 0.5);
-      if (f.alert > 0.3) this.lightmap.add(v.x, v.y, 46, LIGHT.danger, 0.35 * f.alert);
-      const d = Math.hypot(f.x - p.x, f.y - p.y);
-      const threat = clamp(1 - d / 430, 0, 1) * (0.35 + 0.65 * f.alert) * (f.kind === 'hush' ? 1.3 : 1);
-      if (threat > near && (v.x < left + 30 || v.x > right - 30 || f.alert > 0.4)) {
-        near = threat;
-        nearSide = f.x < p.x ? -1 : 1;
-      }
-    }
+    this.combat.update(w, this.pal, alpha, t, left, right, top, bottom, this.lightmap);
+    const near = this.combat.threat;
+    const nearSide = this.combat.threatSide;
 
     this.emitAmbient(w, step, left, right, top, bottom, calm);
     this.motes.update(step);
@@ -379,8 +393,7 @@ export class GameRenderer {
     this.water.draw(this.pal, left, right, bottom, w.waterY, t, calm);
 
     // --- Light ---------------------------------------------------------------------------
-    const frac = clamp(p.lumen / w.diff.lumenMax, 0, 1);
-    const fading = p.fadeT > 0 ? 0.6 + 0.4 * Math.sin(t * 12) : 1;
+    const fading = 1;
     const warm = mixColor(LIGHT.creatureDim, LIGHT.creatureWarm, clamp(p.glow + 0.25, 0, 1));
     if (p.status === 'alive') {
       this.lightmap.add(this.creature.x, this.creature.y, radius, warm, (0.55 + 0.45 * p.glow) * fading);
@@ -396,7 +409,8 @@ export class GameRenderer {
     const roofed = w.ceil.length > 0 && w.ceil.at(cam.x) > OPEN_SKY / 2 ? 1 : 0;
     this.cave += (roofed - this.cave) * damp(1.6, dt);
     const submerged = clamp((top + cam.viewH * 0.5 - w.waterY) / 160, 0, 1);
-    const dim = (1 - this.cave * 0.42) * (1 - submerged * 0.2) * (frac < P.lowLumen ? 0.78 + 0.22 * (frac / P.lowLumen) : 1);
+    // Darkness levels turn the ambient light right down: only what glows can be seen.
+    const dim = (1 - this.cave * 0.42) * (1 - submerged * 0.2) * (w.level.rules.dark ?? 1) * (p.veilT > 0 ? 0.7 : 1);
     this.updateWeather(w, step, calm);
     const a = this.pal.ambient;
     const boost = this.flash * (this.options.reducedMotion ? 0.15 : 0.5);
@@ -406,9 +420,9 @@ export class GameRenderer {
 
     // --- Overlays ------------------------------------------------------------------------
     const danger = clamp(p.danger, 0, 1);
-    const low = frac < P.lowLumen ? 1 - frac / P.lowLumen : 0;
+    const low = p.hp <= 1 && p.status === 'alive' ? 1 : 0;
     this.vignette.tint = mixColor(0x000000, 0x4a1040, danger * 0.8);
-    this.vignette.alpha = clamp(0.3 + low * 0.34 + danger * 0.26 + (p.fadeT > 0 ? 0.2 : 0), 0, 1);
+    this.vignette.alpha = clamp(0.3 + low * 0.34 + danger * 0.2 + (w.level.rules.fog ? 0.25 : 0), 0, 1);
 
     const cue = this.options.visualCues ? near : 0;
     const pulse = 0.6 + 0.4 * Math.sin(t * 5);

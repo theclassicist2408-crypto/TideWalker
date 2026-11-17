@@ -1,10 +1,53 @@
 /** Shared data shapes. Level data is immutable; runtime state lives in World. */
 
-export type BiomeId = 'storm' | 'pools' | 'kelp' | 'ruins' | 'sanctuary';
+export type BiomeId = 'shallows' | 'pools' | 'kelp' | 'ruins' | 'storm' | 'coral' | 'forge' | 'gardens' | 'deep' | 'throne';
 export type Difficulty = 'gentle' | 'standard' | 'intense';
-export type GameMode = 'story' | 'daily' | 'drift' | 'title';
-export type FishKind = 'drifter' | 'angler' | 'hush';
-export type HintKind = 'move' | 'jump' | 'glow' | 'pulse' | 'dive' | 'hide' | 'dash' | 'stop';
+export type GameMode = 'story' | 'tutorial' | 'rematch' | 'drift' | 'title';
+
+/** Movement and combat skills. All are held in the tutorial, lost, then regained through the areas. */
+export type AbilityId = 'dash' | 'wall' | 'double' | 'pulse' | 'dive' | 'airdash' | 'charge' | 'glide';
+/** One per major boss. Exactly one is equipped at a time. */
+export type RewardId = 'tidebreaker' | 'veil' | 'vinehook' | 'echo' | 'stormstep' | 'shield' | 'ember' | 'bloom' | 'void' | 'crown';
+export type UpgradeId = 'health' | 'lumen' | 'essence' | 'pulse';
+
+export type EnemyKind =
+  | 'skitter'
+  | 'spitter'
+  | 'gloomwing'
+  | 'needlefish'
+  | 'burrower'
+  | 'lurker'
+  | 'shellback'
+  | 'broodmother'
+  | 'mite'
+  | 'stormjelly'
+  | 'emberhusk'
+  | 'thornbloom'
+  | 'voidling'
+  | 'sentinel';
+
+export type HintKind =
+  | 'move'
+  | 'jump'
+  | 'double'
+  | 'wall'
+  | 'dash'
+  | 'airdash'
+  | 'swim'
+  | 'dive'
+  | 'glide'
+  | 'attack'
+  | 'downstrike'
+  | 'charge'
+  | 'pulse'
+  | 'heal'
+  | 'glow'
+  | 'danger'
+  | 'bench'
+  | 'pause'
+  | 'boss'
+  | 'rematch'
+  | 'ability';
 
 export interface PlatformDef {
   x: number;
@@ -12,6 +55,27 @@ export interface PlatformDef {
   w: number;
   /** rock: always solid. moonglass: solid only while lit. crumble: falls shortly after being stood on. */
   kind: 'rock' | 'moonglass' | 'crumble';
+  /** Moving platforms travel dx/dy and back over `period` seconds. */
+  dx?: number;
+  dy?: number;
+  period?: number;
+}
+
+/** Solid rectangle: walls to cling to, pillars, shaft sides. `cracked` breaks to a heavy blow. */
+export interface BlockDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind: 'rock' | 'cracked';
+}
+
+/** Hurts on touch. A downward strike bounces off it. */
+export interface SpikeDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface CurrentDef {
@@ -19,24 +83,20 @@ export interface CurrentDef {
   y: number;
   w: number;
   h: number;
-  /** Acceleration applied to anything inside, px/s². */
   fx: number;
   fy: number;
   /** Safe currents glow cyan and restore Lumen. */
   safe: boolean;
-  /** always: constant. rising/falling: only while the tide moves that way. flip: reverses with the tide. beat: on/off timer. */
   mode: 'always' | 'rising' | 'falling' | 'flip' | 'beat';
   period?: number;
   duty?: number;
   phase?: number;
-  /** Whirlpool: pulls toward the centre instead of along (fx, fy); strength = |fx|. */
   radial?: boolean;
 }
 
 export interface KelpDef {
   x: number;
   w: number;
-  /** Base (root) y and height of the fronds. */
   y: number;
   h: number;
 }
@@ -59,42 +119,57 @@ export interface UrchinDef extends PointDef {
 export interface GeyserDef extends PointDef {
   period: number;
   phase: number;
-  /** Upward launch speed. */
   power: number;
 }
 
 export interface GateDef extends PointDef {
-  /** Gate spans from y - h (top) to y (bottom). */
   h: number;
-  /** bloom: opens when lit. tide: opens while the water surface is above (`openAbove`) or below (`openBelow`) a level. */
-  kind: 'bloom' | 'tide';
+  /** bloom: opens when lit. tide: follows the water. arena: closed while its arena is fought. */
+  kind: 'bloom' | 'tide' | 'arena';
   openAbove?: number;
   openBelow?: number;
+  arena?: number;
 }
 
 export interface StoneDef extends PointDef {
-  /** y the stone comes to rest at. */
   restY: number;
 }
 
 export interface ShellDef extends PointDef {
   id: string;
-  /** Hidden shells only shimmer into view when lit. */
   hidden: boolean;
 }
 
 export interface CheckpointDef extends PointDef {
-  /** Tide clock is rewound to at most this value when respawning here. */
   tideCap: number;
   gentleOnly?: boolean;
 }
 
-export interface FishDef {
-  kind: FishKind;
+export interface EnemyDef {
+  kind: EnemyKind;
   x: number;
   y: number;
-  x2: number;
-  y2: number;
+  /** Leash: the enemy never leaves [x0, x1]. */
+  x0: number;
+  x1: number;
+  elite?: boolean;
+  /** Belongs to arena `arena`, wave `wave`: spawned when that wave begins. */
+  arena?: number;
+  wave?: number;
+}
+
+export interface ArenaDef {
+  x0: number;
+  x1: number;
+  /** Floor height, for spawning and telegraphs. */
+  y: number;
+  waves: number;
+  /** Unlocked arenas can be run through; their guardian is optional. */
+  lock: boolean;
+  /** Survive this long instead of clearing (enemies keep coming). */
+  survive?: number;
+  miniboss?: string;
+  boss?: string;
 }
 
 export interface HintDef {
@@ -112,37 +187,61 @@ export interface SecretDef {
 }
 
 export interface KinDef extends PointDef {
-  /** Fleeing kin wake, then swim ahead and vanish. Others follow the player. */
   flee?: boolean;
+}
+
+/** A shrine that restores one lost ability, or a permanent upgrade. */
+export interface GrantDef extends PointDef {
+  ability?: AbilityId;
+  upgrade?: UpgradeId;
+  /** Only given once a guardian (miniboss id) has fallen. */
+  after?: string;
+}
+
+/** Rules that make a level play differently: every level has at least one twist. */
+export interface LevelRules {
+  /** Ambient light multiplier; below ~0.5 the level is a darkness challenge. */
+  dark?: number;
+  /** Seconds to reach the goal. */
+  timeLimit?: number;
+  /** Healing is impossible here. */
+  noHeal?: boolean;
+  /** Glowing calls voidlings out of the dark. */
+  glowHunted?: boolean;
+  /** A wall of black water advances from the left at this speed (px/s). */
+  chase?: number;
+  /** Fog hides enemies until they are close. */
+  fog?: boolean;
+  /** Extra tide speed. */
+  tideRush?: number;
+  /** Everything is under water. */
+  flooded?: boolean;
+  /** Gravity scale (low-gravity or heavy levels). */
+  gravity?: number;
+  /** Constant sideways push (storm wind / deep current), px/s². */
+  wind?: number;
 }
 
 export interface Waypoint {
   x: number;
   y: number;
-  /** Bot should glow while approaching (moonglass, gates, kin). */
   glow?: boolean;
-  /** Bot should stand still until the tide surface is above / below this y. */
   waitTideAbove?: number;
   waitTideBelow?: number;
-  /** Bot waits this many seconds on arrival. */
   pause?: number;
-  /** Bot should arrive via water (swim target) rather than by jumping. */
   swim?: boolean;
-  /** Detour only taken by the collector bot. */
   optional?: boolean;
-  /** Bot should dash-jump toward this point. */
-  dash?: boolean;
-  /** Bot stands here until something (a geyser) throws it upward. */
+  /** Bot hint: how the stretch to this point is meant to be crossed. */
+  act?: 'dash' | 'double' | 'climb' | 'glide';
+  /** Bot must win this arena before moving on. */
+  arena?: number;
   ride?: boolean;
 }
 
 export interface TideDef {
-  /** [time seconds, surface y] keyframes. Smaller y is higher water. */
   keys: [number, number][];
-  /** Swell amplitude and period layered over the keyframes. */
   amp: number;
   period: number;
-  /** Optional slow rise-and-fall ("breathing") added to the keyframes; it drives current reversals. */
   breathAmp?: number;
   breathPeriod?: number;
 }
@@ -152,24 +251,30 @@ export interface WeatherDef {
   wind: number;
   lightning: boolean;
   fog: number;
-  /** 0 new … 1 full. */
   moon: number;
   fireflies: number;
 }
 
 export interface LevelData {
   id: string;
+  /** Area 1–10 (0 for tutorial, drift and title). */
+  area: number;
+  /** Level 1–10 within its area. */
   index: number;
   name: string;
-  /** One short poetic line shown on the chapter card. */
   line: string;
   biome: BiomeId;
+  /** Short name of what makes this level different. */
+  twist: string;
+  rules: LevelRules;
   width: number;
   groundX: number[];
   groundY: number[];
   ceilX: number[];
   ceilY: number[];
   platforms: PlatformDef[];
+  blocks: BlockDef[];
+  spikes: SpikeDef[];
   currents: CurrentDef[];
   kelp: KelpDef[];
   pools: PoolDef[];
@@ -181,7 +286,9 @@ export interface LevelData {
   stones: StoneDef[];
   shells: ShellDef[];
   checkpoints: CheckpointDef[];
-  fish: FishDef[];
+  enemies: EnemyDef[];
+  arenas: ArenaDef[];
+  grants: GrantDef[];
   hints: HintDef[];
   secrets: SecretDef[];
   kin: KinDef[];
@@ -190,8 +297,6 @@ export interface LevelData {
   weather: WeatherDef;
   spawn: PointDef;
   goalX: number;
-  /** Mechanic introduced by this chapter (documentation + chapter card icon). */
-  teaches: string;
 }
 
 /** What the player wants this step. Produced by input (or the bot), consumed by the simulation. */
@@ -200,10 +305,13 @@ export interface Intent {
   my: number;
   jump: boolean;
   jumpHeld: boolean;
-  glow: boolean;
-  pulse: boolean;
-  down: boolean;
+  attack: boolean;
+  attackHeld: boolean;
   dash: boolean;
+  pulse: boolean;
+  glow: boolean;
+  heal: boolean;
+  ability: boolean;
 }
 
 export const newIntent = (): Intent => ({
@@ -211,14 +319,30 @@ export const newIntent = (): Intent => ({
   my: 0,
   jump: false,
   jumpHeld: false,
-  glow: false,
-  pulse: false,
-  down: false,
+  attack: false,
+  attackHeld: false,
   dash: false,
+  pulse: false,
+  glow: false,
+  heal: false,
+  ability: false,
 });
+
+/** What the Tideborn currently owns. Built from the save; the tutorial grants everything. */
+export interface Loadout {
+  abilities: ReadonlySet<AbilityId>;
+  rewards: ReadonlySet<RewardId>;
+  equipped: RewardId | null;
+  hpMax: number;
+  lumenMax: number;
+  essenceMax: number;
+  pulseLevel: number;
+}
 
 export type EventType =
   | 'jump'
+  | 'doubleJump'
+  | 'wallJump'
   | 'land'
   | 'splashIn'
   | 'splashOut'
@@ -227,37 +351,56 @@ export type EventType =
   | 'pulse'
   | 'pulseFail'
   | 'dash'
-  | 'sting'
-  | 'bite'
-  | 'caught'
-  | 'swept'
-  | 'fading'
+  | 'slash'
+  | 'chargeReady'
+  | 'chargeSlash'
+  | 'hit'
+  | 'clang'
+  | 'pogo'
+  | 'kill'
+  | 'hurt'
+  | 'death'
+  | 'healStart'
+  | 'heal'
+  | 'essence'
   | 'pickup'
   | 'plant'
   | 'shell'
   | 'checkpoint'
   | 'goal'
   | 'gateOpen'
+  | 'gateClose'
   | 'crumble'
+  | 'break'
   | 'geyserWarn'
   | 'geyser'
-  | 'fishAlert'
-  | 'fishWindup'
-  | 'fishLunge'
-  | 'fishRipple'
-  | 'nearMiss'
+  | 'enemyWindup'
+  | 'enemyAttack'
+  | 'shot'
+  | 'zoneWarn'
+  | 'zoneHit'
+  | 'spawn'
+  | 'bossIntro'
+  | 'bossPhase'
+  | 'bossDown'
+  | 'minibossDown'
+  | 'arenaStart'
+  | 'arenaClear'
+  | 'grant'
+  | 'ability'
+  | 'abilityFail'
   | 'stoneWarn'
   | 'stoneLand'
   | 'kin'
   | 'secret'
   | 'assist'
   | 'respawn'
-  | 'lowLumen';
+  | 'lowLumen'
+  | 'timeLow';
 
 export interface GameEvent {
   type: EventType;
   x: number;
   y: number;
-  /** Event-specific magnitude (impact speed, amount…). */
   v: number;
 }

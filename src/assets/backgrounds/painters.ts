@@ -194,7 +194,8 @@ export function paintLayer(biome: BiomeId, layer: 0 | 1 | 2): HTMLCanvasElement 
   const bottom = mix(colour, pal.fog, fogMix + 0.25);
   const base = [250, 290, 340][layer];
   const amp = [36, 30, 22][layer];
-  const f = ridge(rng, base, amp, biome === 'pools' || biome === 'sanctuary' ? 1.5 : 1.05);
+  const style = pal.style;
+  const f = ridge(rng, base, amp, style === 'hills' || style === 'spires' ? 1.5 : 1.05);
 
   c.fillStyle = top;
   const stamps = [5, 6, 7][layer];
@@ -206,7 +207,7 @@ export function paintLayer(biome: BiomeId, layer: 0 | 1 | 2): HTMLCanvasElement 
     g.addColorStop(0, top);
     g.addColorStop(1, bottom);
     c.fillStyle = g;
-    if (biome === 'storm') {
+    if (style === 'stacks') {
       if (layer === 1 && i % 3 === 1) wrapped(c, x, 60, (cx) => mast(c, cx, by, 120 + rng() * 50, (rng() - 0.5) * 0.5));
       else {
         const w = (50 + rng() * 70) * scale;
@@ -214,16 +215,16 @@ export function paintLayer(biome: BiomeId, layer: 0 | 1 | 2): HTMLCanvasElement 
         const seed = rng() * 1000;
         wrapped(c, x, w, (cx) => seaStack(c, cx, by, w, h, makeRng(seed)));
       }
-    } else if (biome === 'pools') {
+    } else if (style === 'hills') {
       const w = (120 + rng() * 120) * scale;
       const h = (60 + rng() * 90) * scale;
       wrapped(c, x, w, (cx) => spire(c, cx, by, w, h));
-    } else if (biome === 'kelp') {
+    } else if (style === 'kelp') {
       const h = (150 + rng() * 150) * scale;
       const sway = (rng() - 0.5) * 50;
       const width = (3 + layer * 2 + rng() * 3) * 1;
       wrapped(c, x, 60, (cx) => kelpGiant(c, cx, LAYER_H, h + (LAYER_H - by), sway, width));
-    } else if (biome === 'ruins') {
+    } else if (style === 'ruins') {
       if (layer === 0 && i % 2 === 0) {
         const span = 200 + rng() * 100;
         const h = 90 + rng() * 40;
@@ -243,10 +244,12 @@ export function paintLayer(biome: BiomeId, layer: 0 | 1 | 2): HTMLCanvasElement 
 
   fillRidge(c, f, top, bottom, base - amp * 2);
 
-  if (biome === 'sanctuary') lights(c, rng, 26 + layer * 10, base - 150, LAYER_H - 20, 'rgba(255,224,160,0.9)', 5 - layer);
-  if (biome === 'pools' && layer === 2) lights(c, rng, 14, base - 20, LAYER_H - 30, 'rgba(190,240,255,0.5)', 4);
-  if (biome === 'kelp') lights(c, rng, 10 + layer * 4, 80, LAYER_H - 30, 'rgba(140,255,214,0.4)', 4);
-  if (biome === 'ruins' && layer > 0) lights(c, rng, 6, base - 120, base, 'rgba(200,184,255,0.45)', 4);
+  if (biome === 'throne') lights(c, rng, 26 + layer * 10, base - 150, LAYER_H - 20, 'rgba(255,224,160,0.9)', 5 - layer);
+  if (biome === 'forge') lights(c, rng, 10 + layer * 6, base - 100, LAYER_H - 20, 'rgba(255,150,80,0.55)', 5);
+  if (biome === 'coral') lights(c, rng, 12, base - 120, LAYER_H - 30, 'rgba(255,170,200,0.45)', 4);
+  if (style === 'hills' && layer === 2) lights(c, rng, 14, base - 20, LAYER_H - 30, 'rgba(190,240,255,0.5)', 4);
+  if (style === 'kelp') lights(c, rng, 10 + layer * 4, 80, LAYER_H - 30, 'rgba(140,255,214,0.4)', 4);
+  if (style === 'ruins' && layer > 0) lights(c, rng, 6, base - 120, base, 'rgba(200,184,255,0.45)', 4);
 
   // Mist pooling at the foot of each layer.
   const mist = c.createLinearGradient(0, base - 30, 0, LAYER_H);

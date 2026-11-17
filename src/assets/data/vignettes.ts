@@ -377,9 +377,9 @@ export function paintVignette(canvas: HTMLCanvasElement, index: number): void {
   ctx.restore();
 }
 
-/** Maps a shell id like `ch03-2` to its vignette index, or -1. */
+/** Maps a shell id like `a03-2` to its vignette index, or -1. */
 export function vignetteForShell(id: string): number {
-  const m = /^ch(\d{2})-(\d)$/.exec(id);
+  const m = /^a(\d{2})-(\d)$/.exec(id);
   if (!m) return -1;
   const index = (Number(m[1]) - 1) * 2 + (Number(m[2]) - 1);
   return index >= 0 && index < PAINTERS.length ? index : -1;
@@ -387,6 +387,6 @@ export function vignetteForShell(id: string): number {
 
 /** Shell id for vignette `index`. */
 export function shellForVignette(index: number): string {
-  const chapter = Math.floor(index / 2) + 1;
-  return `ch${chapter < 10 ? '0' : ''}${chapter}-${(index % 2) + 1}`;
+  const area = Math.floor(index / 2) + 1;
+  return `a${area < 10 ? '0' : ''}${area}-${(index % 2) + 1}`;
 }

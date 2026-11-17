@@ -1,43 +1,63 @@
 import { newIntent, type Intent } from '../core/types';
-import { GestureRecognizer } from './gestures';
+import { Controls, type ControlButton } from './controls';
 
-const KEY_LEFT = ['ArrowLeft', 'KeyA'];
-const KEY_RIGHT = ['ArrowRight', 'KeyD'];
-const KEY_UP = ['ArrowUp', 'KeyW'];
-const KEY_DOWN = ['ArrowDown', 'KeyS'];
-const KEY_JUMP = ['Space'];
-const KEY_GLOW = ['ShiftLeft', 'ShiftRight', 'KeyG'];
-const KEY_PULSE = ['KeyE', 'KeyX'];
-const KEY_DASH = ['KeyQ', 'KeyC'];
+const KEYS: Record<string, ControlButton> = {
+  Space: 'jump',
+  KeyZ: 'jump',
+  KeyX: 'attack',
+  KeyJ: 'attack',
+  KeyC: 'dash',
+  KeyK: 'dash',
+  ShiftLeft: 'dash',
+  KeyV: 'light',
+  KeyL: 'light',
+  KeyE: 'light',
+  KeyH: 'heal',
+  KeyR: 'heal',
+  KeyF: 'ability',
+};
+const DIRS: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  KeyA: [-1, 0],
+  ArrowRight: [1, 0],
+  KeyD: [1, 0],
+  ArrowUp: [0, -1],
+  KeyW: [0, -1],
+  ArrowDown: [0, 1],
+  KeyS: [0, 1],
+};
 
 /**
- * Binds touch/mouse (through the gesture recogniser) and keyboard to a single Intent.
- * Keyboard is direct control for desktop; touch latches a direction for one-thumb play.
+ * Binds the on-screen pad and the keyboard to one Intent. The pad is plain DOM: a floating
+ * stick on one side and action buttons on the other, each tracking its own pointer so
+ * several can be held at once.
  */
 export class InputManager {
-  readonly gestures = new GestureRecognizer();
+  readonly controls = new Controls();
   private readonly keys = new Set<string>();
-  private keyJump = false;
-  private keyPulse = false;
-  private keyDash = false;
-  private usingKeys = false;
-  private enabled = false;
   private readonly intent = newIntent();
-  /** Fires on the first user gesture; audio must be unlocked from one. */
+  private enabled = false;
+  private usingKeys = false;
+  private stickPointer = -1;
+  private stickX = 0;
+  private stickY = 0;
+  private knob: HTMLElement | null = null;
+  private base: HTMLElement | null = null;
   onFirstGesture: (() => void) | null = null;
   onPauseKey: (() => void) | null = null;
+  /** Called when the player asks to switch boss gifts (Q, or tapping the gift icon). */
+  onCycle: (() => void) | null = null;
   private gestureSeen = false;
 
-  constructor(private readonly surface: HTMLElement) {
-    const opts: AddEventListenerOptions = { passive: false };
-    surface.addEventListener('pointerdown', this.onDown, opts);
-    surface.addEventListener('pointermove', this.onMove, opts);
-    surface.addEventListener('pointerup', this.onUp, opts);
-    surface.addEventListener('pointercancel', this.onUp, opts);
-    surface.addEventListener('contextmenu', (e) => e.preventDefault());
+  constructor(pad: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', () => this.release());
+    this.bindPad(pad);
+  }
+
+  get keyboardActive(): boolean {
+    return this.usingKeys;
   }
 
   setEnabled(on: boolean): void {
@@ -45,17 +65,16 @@ export class InputManager {
     if (!on) this.release();
   }
 
-  /** Clears latched movement (new level, respawn). */
   reset(): void {
-    this.gestures.reset();
+    this.controls.reset();
     this.keys.clear();
-    this.keyJump = this.keyPulse = this.keyDash = false;
+    this.centreStick();
   }
 
-  /** Drops held touches and keys but keeps the latched direction. */
   release(): void {
-    this.gestures.cancel();
+    this.controls.reset();
     this.keys.clear();
+    this.centreStick();
   }
 
   private first(): void {
@@ -64,26 +83,78 @@ export class InputManager {
     this.onFirstGesture?.();
   }
 
-  private onDown = (e: PointerEvent): void => {
-    this.first();
-    if (!this.enabled) return;
-    e.preventDefault();
-    this.usingKeys = false;
-    this.surface.setPointerCapture?.(e.pointerId);
-    this.gestures.down(e.pointerId, e.clientX, e.clientY, e.timeStamp);
-  };
+  private centreStick(): void {
+    this.stickPointer = -1;
+    if (this.knob) this.knob.style.transform = '';
+    this.base?.classList.remove('on');
+  }
 
-  private onMove = (e: PointerEvent): void => {
-    if (!this.enabled) return;
-    e.preventDefault();
-    this.gestures.move(e.pointerId, e.clientX, e.clientY, e.timeStamp);
-  };
-
-  private onUp = (e: PointerEvent): void => {
-    if (!this.enabled) return;
-    e.preventDefault();
-    this.gestures.up(e.pointerId, e.clientX, e.clientY, e.timeStamp);
-  };
+  private bindPad(pad: HTMLElement): void {
+    const zone = pad.querySelector<HTMLElement>('.pad-stick');
+    this.base = pad.querySelector<HTMLElement>('.pad-base');
+    this.knob = pad.querySelector<HTMLElement>('.pad-knob');
+    const opts: AddEventListenerOptions = { passive: false };
+    if (zone) {
+      zone.addEventListener(
+        'pointerdown',
+        (e) => {
+          this.first();
+          if (!this.enabled || this.stickPointer !== -1) return;
+          e.preventDefault();
+          this.usingKeys = false;
+          this.stickPointer = e.pointerId;
+          zone.setPointerCapture?.(e.pointerId);
+          this.stickX = e.clientX;
+          this.stickY = e.clientY;
+          // The stick appears under the thumb, wherever it lands.
+          if (this.base) {
+            const r = zone.getBoundingClientRect();
+            this.base.style.left = `${e.clientX - r.left}px`;
+            this.base.style.top = `${e.clientY - r.top}px`;
+            this.base.classList.add('on');
+          }
+        },
+        opts,
+      );
+      const move = (e: PointerEvent): void => {
+        if (e.pointerId !== this.stickPointer) return;
+        e.preventDefault();
+        const reach = 44;
+        const dx = Math.max(-reach, Math.min(reach, e.clientX - this.stickX));
+        const dy = Math.max(-reach, Math.min(reach, e.clientY - this.stickY));
+        this.controls.stick(dx / reach, dy / reach);
+        if (this.knob) this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      };
+      const end = (e: PointerEvent): void => {
+        if (e.pointerId !== this.stickPointer) return;
+        this.controls.stick(0, 0);
+        this.centreStick();
+      };
+      zone.addEventListener('pointermove', move, opts);
+      zone.addEventListener('pointerup', end, opts);
+      zone.addEventListener('pointercancel', end, opts);
+    }
+    pad.querySelectorAll<HTMLElement>('[data-btn]').forEach((el) => {
+      const name = el.dataset.btn as ControlButton;
+      const down = (e: PointerEvent): void => {
+        this.first();
+        if (!this.enabled) return;
+        e.preventDefault();
+        this.usingKeys = false;
+        el.setPointerCapture?.(e.pointerId);
+        el.classList.add('down');
+        this.controls.press(name, e.timeStamp);
+      };
+      const up = (e: PointerEvent): void => {
+        el.classList.remove('down');
+        this.controls.release(name, e.timeStamp);
+      };
+      el.addEventListener('pointerdown', down, opts);
+      el.addEventListener('pointerup', up, opts);
+      el.addEventListener('pointercancel', up, opts);
+      el.addEventListener('contextmenu', (e) => e.preventDefault());
+    });
+  }
 
   private onKeyDown = (e: KeyboardEvent): void => {
     this.first();
@@ -92,50 +163,44 @@ export class InputManager {
       return;
     }
     if (!this.enabled) return;
-    const known = [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_JUMP, KEY_GLOW, KEY_PULSE, KEY_DASH].some((k) => k.includes(e.code));
-    if (!known) return;
+    if (e.code === 'KeyQ') {
+      if (!e.repeat) this.onCycle?.();
+      return;
+    }
+    const button = KEYS[e.code];
+    if (!button && !DIRS[e.code]) return;
     e.preventDefault();
     this.usingKeys = true;
     if (e.repeat) return;
     this.keys.add(e.code);
-    if (KEY_JUMP.includes(e.code) || KEY_UP.includes(e.code)) this.keyJump = true;
-    if (KEY_PULSE.includes(e.code)) this.keyPulse = true;
-    if (KEY_DASH.includes(e.code)) this.keyDash = true;
+    if (button) this.controls.press(button, e.timeStamp);
+    this.applyKeys();
   };
 
   private onKeyUp = (e: KeyboardEvent): void => {
-    this.keys.delete(e.code);
+    if (!this.keys.delete(e.code)) return;
+    const button = KEYS[e.code];
+    // Two keys can share an action; release only when none is still down.
+    if (button && ![...this.keys].some((k) => KEYS[k] === button)) this.controls.release(button, e.timeStamp);
+    this.applyKeys();
   };
 
-  /** True while the player is driving with the keyboard (hints then show keys). */
-  get keyboardActive(): boolean {
-    return this.usingKeys;
-  }
-
-  private held(codes: string[]): boolean {
-    for (const c of codes) if (this.keys.has(c)) return true;
-    return false;
+  private applyKeys(): void {
+    let x = 0;
+    let y = 0;
+    for (const k of this.keys) {
+      const d = DIRS[k];
+      if (d) {
+        x += d[0];
+        y += d[1];
+      }
+    }
+    this.controls.stick(Math.sign(x), Math.sign(y));
   }
 
   /** Current intent. Call once per simulation step; edge actions are consumed. */
   read(nowMs: number): Intent {
-    const out = this.intent;
-    if (this.usingKeys) {
-      this.gestures.read(nowMs, out);
-      out.mx = (this.held(KEY_RIGHT) ? 1 : 0) - (this.held(KEY_LEFT) ? 1 : 0);
-      out.my = (this.held(KEY_DOWN) ? 1 : 0) - (this.held(KEY_UP) ? 1 : 0);
-      out.down = this.held(KEY_DOWN);
-      out.jump = this.keyJump;
-      out.jumpHeld = this.held(KEY_JUMP) || this.held(KEY_UP);
-      out.glow = this.held(KEY_GLOW);
-      out.pulse = this.keyPulse || out.pulse;
-      out.dash = this.keyDash;
-      this.gestures.lx = 0;
-      this.gestures.ly = 0;
-    } else {
-      this.gestures.read(nowMs, out);
-    }
-    this.keyJump = this.keyPulse = this.keyDash = false;
-    return out;
+    this.controls.read(nowMs, this.intent);
+    return this.intent;
   }
 }

@@ -1,33 +1,51 @@
+import { AREA_COUNT, LEVELS_PER_AREA } from '../core/constants';
 import type { LevelData } from '../core/types';
-import { ch01 } from './chapters/ch01';
-import { ch02 } from './chapters/ch02';
-import { ch03 } from './chapters/ch03';
-import { ch04 } from './chapters/ch04';
-import { ch05 } from './chapters/ch05';
-import { ch06 } from './chapters/ch06';
-import { ch07 } from './chapters/ch07';
-import { ch08 } from './chapters/ch08';
-import { ch09 } from './chapters/ch09';
-import { ch10 } from './chapters/ch10';
+import { AREA_1, LEVELS_1 } from './areas/a01';
+import { buildLevel, type AreaInfo, type LevelSpec } from './areas/common';
+import { tutorialLevel } from './tutorial';
 
-const BUILDERS: (() => LevelData)[] = [ch01, ch02, ch03, ch04, ch05, ch06, ch07, ch08, ch09, ch10];
-const cache = new Map<number, LevelData>();
+const AREAS: { info: AreaInfo; levels: LevelSpec[] }[] = [{ info: AREA_1, levels: LEVELS_1 }];
 
-export const CHAPTER_COUNT = BUILDERS.length;
+const cache = new Map<string, LevelData>();
 
-/** Returns chapter `index` (1-based). Levels are built once and cached. */
-export function getChapter(index: number): LevelData {
-  if (index < 1 || index > BUILDERS.length) throw new Error(`No chapter ${index}`);
-  let level = cache.get(index);
+export const areaCount = (): number => AREAS.length;
+
+export function areaInfo(area: number): AreaInfo {
+  const a = AREAS[area - 1];
+  if (!a) throw new Error(`No area ${area}`);
+  return a.info;
+}
+
+export function allAreas(): AreaInfo[] {
+  return AREAS.map((a) => a.info);
+}
+
+/** Level `n` (1–10) of area `area` (1–10). Built once and cached. */
+export function getLevel(area: number, n: number): LevelData {
+  const a = AREAS[area - 1];
+  if (!a || n < 1 || n > a.levels.length) throw new Error(`No level ${area}-${n}`);
+  const key = `${area}:${n}`;
+  let level = cache.get(key);
   if (!level) {
-    level = BUILDERS[index - 1]();
-    cache.set(index, level);
+    level = buildLevel(a.info, n, a.levels[n - 1]);
+    cache.set(key, level);
   }
   return level;
 }
 
-export function allChapters(): LevelData[] {
+export function getTutorial(): LevelData {
+  let level = cache.get('tutorial');
+  if (!level) {
+    level = tutorialLevel();
+    cache.set('tutorial', level);
+  }
+  return level;
+}
+
+export function allLevels(): LevelData[] {
   const out: LevelData[] = [];
-  for (let i = 1; i <= BUILDERS.length; i++) out.push(getChapter(i));
+  for (let a = 1; a <= AREAS.length; a++) for (let n = 1; n <= AREAS[a - 1].levels.length; n++) out.push(getLevel(a, n));
   return out;
 }
+
+export const TOTAL_LEVELS = AREA_COUNT * LEVELS_PER_AREA;

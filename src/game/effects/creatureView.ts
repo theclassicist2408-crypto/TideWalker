@@ -90,7 +90,7 @@ export class CreatureView {
       y -= Math.abs(Math.sin(this.stride)) * 2.6;
     }
     const breath = Math.sin(this.time * 2.3) * 0.028;
-    const crouch = p.crouch ? 0.22 : 0;
+    const crouch = p.healT > 0 ? 0.2 : p.sliding ? 0.1 : 0;
 
     this.face += ((p.facing >= 0 ? 1 : -1) - this.face) * damp(16, dt);
     const targetRot = p.swim ? Math.atan2(p.vy, Math.abs(p.vx) + 30) * 0.9 : p.onGround ? 0 : clamp(p.vy / 900, -0.5, 0.6);
@@ -107,12 +107,12 @@ export class CreatureView {
     );
 
     // Colour: dim blue-grey when spent, warm gold when shining.
-    const frac = clamp(p.lumen / w.diff.lumenMax, 0, 1);
+    const frac = clamp(p.lumen / w.load.lumenMax, 0, 1);
     const warmth = clamp(p.glow * 0.85 + frac * 0.3, 0, 1);
     const tint = mixColor(LIGHT.creatureDim, LIGHT.creatureWarm, warmth);
     const flicker = p.invuln > 0 ? 0.55 + 0.45 * Math.sin(this.time * 38) : 1;
-    const fading = p.fadeT > 0 ? 0.5 + 0.5 * Math.sin(this.time * 12) : 1;
-    const bodyAlpha = (p.hidden ? 0.5 : 1) * flicker * (p.status === 'alive' ? 1 : Math.max(0, 1 - p.statusT * 1.2));
+    const fading = p.veilT > 0 ? 0.45 : 1;
+    const bodyAlpha = (p.veilT > 0 ? 0.6 : 1) * flicker * (p.status === 'alive' ? 1 : Math.max(0, 1 - p.statusT * 1.2));
     this.body.tint = tint;
     this.fin.tint = tint;
     this.inner.alpha = bodyAlpha;
