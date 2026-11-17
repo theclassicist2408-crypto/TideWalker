@@ -63,9 +63,9 @@ export const P = {
   pulseDamage: 5,
   pulseReveal: 2.6,
   // Health and healing.
-  healTime: 0.95,
-  essencePerHit: 0.2,
-  invuln: 1.05,
+  healTime: 0.8,
+  essencePerHit: 0.25,
+  invuln: 1.2,
   knockX: 250,
   knockY: 300,
   hitstop: 0.05,
@@ -92,12 +92,12 @@ export interface DifficultyTuning {
 }
 
 export const DIFF: Record<Difficulty, DifficultyTuning> = {
-  gentle: { hpBonus: 2, enemyHp: 0.8, bossHp: 0.8, enemySpeed: 0.86, telegraph: 1.3, tideRate: 0.75, healAmount: 2, mercy: 1.3 },
-  standard: { hpBonus: 0, enemyHp: 1, bossHp: 1, enemySpeed: 1, telegraph: 1, tideRate: 1, healAmount: 1, mercy: 1 },
-  intense: { hpBonus: 0, enemyHp: 1.15, bossHp: 1, enemySpeed: 1.08, telegraph: 0.88, tideRate: 1.25, healAmount: 1, mercy: 0.85 },
+  gentle: { hpBonus: 2, enemyHp: 0.7, bossHp: 0.7, enemySpeed: 0.82, telegraph: 1.45, tideRate: 0.75, healAmount: 2, mercy: 1.3 },
+  standard: { hpBonus: 0, enemyHp: 0.88, bossHp: 0.88, enemySpeed: 0.94, telegraph: 1.15, tideRate: 1, healAmount: 1, mercy: 1 },
+  intense: { hpBonus: 0, enemyHp: 1.05, bossHp: 0.95, enemySpeed: 1.02, telegraph: 0.96, tideRate: 1.25, healAmount: 1, mercy: 0.85 },
 };
 
-export const BASE_HP = 5;
+export const BASE_HP = 6;
 export const BASE_LUMEN = 100;
 export const BASE_ESSENCE = 3;
 

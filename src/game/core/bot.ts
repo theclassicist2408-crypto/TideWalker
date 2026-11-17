@@ -118,7 +118,10 @@ export class Bot {
       const dx = c.x - p.x;
       const dy = c.y - p.y;
       // Reached — or standing right above a point it cannot get down to (buried, or under water with no dive).
-      const sunk = p.swim && dy > 0 && !w.has('dive');
+      // Under water above low points the route climbs out of again (a current carried us up): skip them.
+      let lifted = false;
+      if (p.swim && dy > 30 && !c.optional) for (let k = 1; k <= 3 && !lifted; k++) lifted = (wps[this.index + k]?.y ?? Infinity) < p.y + 10;
+      const sunk = p.swim && dy > 0 && (!w.has('dive') || lifted);
       if (Math.abs(dx) < 15 && (Math.abs(dy) < 26 || sunk || (p.onGround && dy > 0 && dy < 70))) {
         if (c.arena !== undefined) {
           t = c;
