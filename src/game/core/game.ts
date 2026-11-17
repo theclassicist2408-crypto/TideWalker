@@ -84,6 +84,7 @@ export class Game implements UiHost {
     this.input.onPauseKey = () => this.togglePause();
     this.input.onCycle = () => this.cycleGift();
     this.input.onCycleRelic = () => this.cycleRelic();
+    this.input.onMenu = (a) => this.ui.navigate(a);
     this.hud.onPause = () => this.togglePause();
     this.hud.onCycle = () => this.cycleGift();
     this.hud.onRelic = () => this.input.tapItem();
@@ -97,11 +98,7 @@ export class Game implements UiHost {
     for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
       window.addEventListener(type, () => this.audio.unlock(), { passive: true });
     }
-    const sideways = window.matchMedia('(orientation: landscape) and (max-height: 480px) and (pointer: coarse)');
-    window.addEventListener('resize', () => {
-      this.renderer.resize();
-      if (sideways.matches && this.state === 'playing' && !this.bot) this.pause();
-    });
+    window.addEventListener('resize', () => this.renderer.resize());
     window.addEventListener('orientationchange', () => window.setTimeout(() => this.renderer.resize(), 200));
     document.addEventListener('visibilitychange', () => (document.hidden ? this.background() : this.foreground()));
     window.addEventListener('pagehide', () => this.background());
@@ -398,6 +395,7 @@ export class Game implements UiHost {
     this.clock += dt;
     this.stateT += dt;
     const frozen = this.state === 'paused';
+    this.input.pollGamepad(now, this.state === 'playing' && !this.bot);
 
     if (!frozen) {
       const w = this.world;

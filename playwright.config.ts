@@ -30,6 +30,7 @@ export default defineConfig({
     { name: 'phone', use: { viewport: { width: 393, height: 851 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true }, testIgnore: /desktop\.spec\.ts/ },
     { name: 'small-phone', use: { viewport: { width: 320, height: 568 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true }, testMatch: /layout\.spec\.ts/ },
     { name: 'large-phone', use: { viewport: { width: 430, height: 932 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true }, testMatch: /layout\.spec\.ts/ },
+    { name: 'phone-landscape', use: { viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true }, testMatch: /layout\.spec\.ts/ },
     { name: 'tablet', use: { viewport: { width: 820, height: 1180 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true }, testMatch: /layout\.spec\.ts/ },
     { name: 'desktop', use: { viewport: { width: 1280, height: 800 } }, testMatch: /(layout|desktop)\.spec\.ts/ },
   ],

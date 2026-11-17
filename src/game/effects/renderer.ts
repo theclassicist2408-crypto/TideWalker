@@ -1,7 +1,7 @@
 import { Application, Container, type Sprite } from 'pixi.js';
 import { LIGHT, PALETTES, type Palette } from '../../assets/data/palettes';
 import { Camera } from '../core/camera';
-import { P, VIEW_MIN_H, VIEW_W } from '../core/constants';
+import { P, VIEW_LAND_H, VIEW_LAND_MIN_W, VIEW_MIN_H, VIEW_W } from '../core/constants';
 import type { GameEvent } from '../core/types';
 import { clamp, damp } from '../core/util';
 import type { World } from '../core/world';
@@ -145,7 +145,9 @@ export class GameRenderer {
     this.app.resize();
     const w = (this.screenW = this.app.screen.width);
     const h = (this.screenH = this.app.screen.height);
-    this.scale = Math.min(w / VIEW_W, h / VIEW_MIN_H);
+    // Portrait fits a fixed width; landscape fits a fixed height, so the hero is the same size on a
+    // laptop as on a sideways phone and the extra width shows more of the way ahead.
+    this.scale = w > h ? Math.min(h / VIEW_LAND_H, w / VIEW_LAND_MIN_W) : Math.min(w / VIEW_W, h / VIEW_MIN_H);
     this.camera.setView(w / this.scale, h / this.scale);
     this.background.resize(w, h);
     this.lightmap.resize(w, h);

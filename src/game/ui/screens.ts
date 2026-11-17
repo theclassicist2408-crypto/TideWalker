@@ -99,6 +99,26 @@ export class Ui {
     this.render();
   }
 
+  /** Gamepad and arrow-key menu navigation: move focus through the screen's buttons, press, go back. */
+  navigate(action: 'prev' | 'next' | 'choose' | 'back'): void {
+    const screen = this.current;
+    if (!screen) return;
+    const items = Array.from(screen.querySelectorAll<HTMLElement>('button:not([disabled]), input'));
+    if (items.length === 0) return;
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    if (action === 'prev' || action === 'next') {
+      const next = at < 0 ? 0 : (at + (action === 'next' ? 1 : -1) + items.length) % items.length;
+      items[next].focus();
+      items[next].scrollIntoView({ block: 'nearest' });
+    } else if (action === 'choose') {
+      (at >= 0 ? items[at] : items[0]).click();
+    } else {
+      const back = screen.querySelector<HTMLElement>('.screen-head .icon-btn');
+      if (back) back.click();
+      else if (this.active === 'pause') this.host.resume();
+    }
+  }
+
   clear(): void {
     this.stack.length = 0;
     this.cancelTimers();

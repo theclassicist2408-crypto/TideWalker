@@ -1,5 +1,6 @@
 import { newIntent, type Intent } from '../core/types';
 import { Controls, type ControlButton } from './controls';
+import { GamepadReader, PAD } from './gamepad';
 
 const KEYS: Record<string, ControlButton> = {
   Space: 'jump',
@@ -51,6 +52,12 @@ export class InputManager {
   /** Called when the player asks to switch relics (T). */
   onCycleRelic: (() => void) | null = null;
   private gestureSeen = false;
+  private readonly pad = new GamepadReader();
+  /** True while the gamepad's stick is steering, so the keyboard does not override it. */
+  private padSteering = false;
+  private padHeld = new Set<ControlButton>();
+  /** Called each frame a gamepad asks to move through a menu (-1 back, +1 forward), choose or go back. */
+  onMenu: ((action: 'prev' | 'next' | 'choose' | 'back') => void) | null = null;
 
   constructor(pad: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
@@ -75,6 +82,8 @@ export class InputManager {
   }
 
   release(): void {
+    this.padHeld.clear();
+    this.padSteering = false;
     this.controls.reset();
     this.keys.clear();
     this.centreStick();
@@ -165,7 +174,16 @@ export class InputManager {
       if (!e.repeat) this.onPauseKey?.();
       return;
     }
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      // Menus: arrows move between buttons (Enter and Space press them, as browsers do).
+      const nav = e.code === 'ArrowUp' || e.code === 'ArrowLeft' ? 'prev' : e.code === 'ArrowDown' || e.code === 'ArrowRight' ? 'next' : null;
+      const inField = e.target instanceof HTMLInputElement;
+      if (nav && !inField) {
+        e.preventDefault();
+        this.onMenu?.(nav);
+      }
+      return;
+    }
     if (e.code === 'KeyQ') {
       if (!e.repeat) this.onCycle?.();
       return;
@@ -203,6 +221,50 @@ export class InputManager {
       }
     }
     this.controls.stick(Math.sign(x), Math.sign(y));
+  }
+
+  /**
+   * Polls the gamepad once per frame. In play it feeds the same Controls as touch and keys;
+   * on menus it moves focus and chooses. Start pauses, Select switches gifts.
+   */
+  pollGamepad(now: number, playing: boolean): void {
+    const f = this.pad.read();
+    if (!f) return;
+    if (f.pressed.size > 0 || f.x !== 0 || f.y !== 0) this.first();
+    if (f.pressed.has(PAD.START)) this.onPauseKey?.();
+    if (!playing || !this.enabled) {
+      this.releasePad(now);
+      if (f.pressed.has(PAD.UP) || f.pressed.has(PAD.LEFT)) this.onMenu?.('prev');
+      if (f.pressed.has(PAD.DOWN) || f.pressed.has(PAD.RIGHT)) this.onMenu?.('next');
+      if (f.pressed.has(PAD.A)) this.onMenu?.('choose');
+      if (f.pressed.has(PAD.B)) this.onMenu?.('back');
+      return;
+    }
+    if (f.pressed.has(PAD.SELECT)) this.onCycle?.();
+    this.usingKeys = true;
+    for (const [i, name] of PAD.PLAY) {
+      const down = f.down.has(i);
+      if (down && !this.padHeld.has(name)) {
+        this.padHeld.add(name);
+        this.controls.press(name, now);
+      } else if (!down && this.padHeld.has(name)) {
+        this.padHeld.delete(name);
+        this.controls.release(name, now);
+      }
+    }
+    if (f.x !== 0 || f.y !== 0) {
+      this.padSteering = true;
+      this.controls.stick(f.x, f.y);
+    } else if (this.padSteering) {
+      this.padSteering = false;
+      this.applyKeys();
+    }
+  }
+
+  private releasePad(now: number): void {
+    for (const name of this.padHeld) this.controls.release(name, now);
+    this.padHeld.clear();
+    this.padSteering = false;
   }
 
   /** The relic badge was tapped: use the relic once. */

@@ -4,6 +4,9 @@ import type { AbilityId, Difficulty, RelicId, RewardId, StyleId, SwordId } from 
 /** World width that fits a portrait phone screen: smaller means a closer camera. */
 export const VIEW_W = 280;
 export const VIEW_MIN_H = 470;
+/** Landscape screens (desktop, sideways phones): world height shown, and the narrowest width. */
+export const VIEW_LAND_H = 380;
+export const VIEW_LAND_MIN_W = 480;
 export const FIXED_DT = 1 / 60;
 export const MAX_STEPS_PER_FRAME = 5;
 

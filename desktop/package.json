@@ -1,0 +1,43 @@
+{
+  "name": "tidewalker-desktop",
+  "version": "2.0.0",
+  "description": "Tidewalker for macOS, Windows and Linux: the web build in a native window.",
+  "private": true,
+  "main": "main.cjs",
+  "author": "Tidewalker",
+  "scripts": {
+    "start": "node prepare.mjs && electron .",
+    "mac": "node prepare.mjs && electron-builder --mac",
+    "win": "node prepare.mjs && electron-builder --win --x64",
+    "linux": "node prepare.mjs && electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "45.3.4",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.tidewalker.game",
+    "productName": "Tidewalker",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": ["main.cjs", "web/**/*"],
+    "mac": {
+      "category": "public.app-category.action-games",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "icon": "web/icons/icon-1024.png",
+      "identity": null
+    },
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "web/icons/icon-512.png",
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Game",
+      "icon": "web/icons/icon-512.png"
+    }
+  }
+}

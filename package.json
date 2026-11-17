@@ -1,13 +1,19 @@
 {
   "name": "tidewalker",
   "version": "2.0.0",
-  "description": "Tidewalker — a fast, boss-driven 2D action-platformer across ten drowned areas.",
+  "description": "Tidewalker \u2014 a fast, boss-driven 2D action-platformer across ten drowned areas.",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173 --strictPort",
+    "desktop:start": "npm run build && npm --prefix desktop install && npm --prefix desktop start",
+    "desktop:mac": "npm run build && npm --prefix desktop install && npm --prefix desktop run mac",
+    "desktop:win": "npm run build && npm --prefix desktop install && npm --prefix desktop run win",
+    "mobile:android": "node scripts/mobile.mjs android",
+    "mobile:ios": "node scripts/mobile.mjs ios",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
@@ -22,6 +28,10 @@
     "pixi.js": "^8.6.0"
   },
   "devDependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/cli": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2",
     "@eslint/js": "^9.15.0",
     "@playwright/test": "^1.49.0",
     "@types/node": "^26.6.6",
