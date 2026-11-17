@@ -8,6 +8,9 @@ procedural. Repository: https://github.com/theclassicist2408-crypto/TideWalker
 | Task | Command |
 | --- | --- |
 | Install | `npm install` |
+| Run on a phone over Wi-Fi | `npm run dev:lan` |
+| Desktop app (Electron, `desktop/`) | `npm run desktop:start` · `desktop:mac` (.dmg) · `desktop:win` (.zip) |
+| Android / iOS (Capacitor) | `npm run mobile:android` · `mobile:ios` (needs Android Studio / Xcode) |
 | Run (dev server, port 5173) | `npm run dev` |
 | Typecheck | `npm run typecheck` |
 | Lint | `npm run lint` |
@@ -33,7 +36,11 @@ procedural. Repository: https://github.com/theclassicist2408-crypto/TideWalker
   abilities a level may require (`ABILITY_SCHEDULE`).
 - `src/game/effects` — everything PixiJS. Reads World state and events; never mutates gameplay.
 - `src/game/audio` — `director.ts` is pure (state → mix); `engine.ts` is the only Web Audio code.
-- `src/game/input` — `controls.ts` is pure and unit-tested; `input.ts` binds the touch pad and keyboard.
+- `src/game/input` — `controls.ts` and `gamepad.ts` are pure and unit-tested; `input.ts` binds the touch
+  pad, keyboard and gamepads.
+- Economy: `SWORDS`, `STYLES`, `RELICS`, `FORGE`, `LOOT` in `core/constants.ts`; plasma is banked by
+  World `bank` events; chests and trials are built by `LevelBuilder.chest/trial` (trials past the goal).
+- `desktop/` — Electron shell with its own package.json; the game never imports it.
 - `src/game/ui` — DOM/CSS HUD and screens. Talks to the game only through the `UiHost` interface.
 - `src/game/save` — the only code that touches `localStorage`.
 - `src/assets` — procedural painters and data. No binary assets.
@@ -47,6 +54,7 @@ procedural. Repository: https://github.com/theclassicist2408-crypto/TideWalker
 - New visuals go through the atlas (`assets/sprites/atlas.ts`) and the pooled `ParticleLayer`.
 - Comments explain why. No TODOs, no placeholder art, no dead code.
 - Add a dependency only if it replaces a substantial amount of code. Runtime deps: PixiJS only.
+  Packaging tools (Capacitor, Electron) are dev-only and never imported by `src/`.
 
 ## Asset rules
 
@@ -66,6 +74,8 @@ procedural. Repository: https://github.com/theclassicist2408-crypto/TideWalker
 - Lanterns (checkpoints) no more than 2700 px apart (chases restart from the top by design).
 - Water is never an instant failure. Basins hold still water (`basin`, `pit({ swim: true })`).
 - Two Memory Shells per area, ids `aNN-1` / `aNN-2`, at least one hidden.
+- A chest on every level (added by `buildLevel`); trials on levels 2, 5, 8 unless the level is a chase,
+  timed or flooded.
 
 ## Testing rules
 

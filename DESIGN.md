@@ -24,7 +24,7 @@ power or gift → use it to go deeper.
 
 | System | Rule |
 | --- | --- |
-| Health | Five masks (seven on Gentle), plus upgrades. A hit costs a mask, knocks back and grants about a second of invulnerability. |
+| Health | Six masks (eight on Gentle), plus Armour and guardian upgrades. A hit costs a mask, knocks back and grants 1.2 s of invulnerability. |
 | Light-blade | 10 damage, side / up / down. A down-strike in the air pogoes off foes, spikes and urchins and restores the double jump and air dash. |
 | Lumen Strike | Hold Strike 0.55 s, release: 34 damage, longer reach, breaks shellback guards, thornbloom armour and cracked stone. Costs Lumen. |
 | Lumen | 100 (+25 per upgrade). Powers glow (reveals moonglass, opens bloom gates), Pulse, Lumen Strike and gifts. Refills over time, faster in moon pools. |
@@ -81,14 +81,29 @@ Flying bosses come down to recover, which is when they can be struck.
 | | Gentle | Standard | Intense |
 | --- | --- | --- | --- |
 | Extra masks | +2 | 0 | 0 |
-| Enemy health | ×0.8 | ×1 | ×1.15 |
-| Boss health | ×0.8 | ×1 | ×1 |
-| Enemy speed | ×0.86 | ×1 | ×1.08 |
-| Telegraph time | ×1.3 | ×1 | ×0.88 |
+| Enemy health | ×0.7 | ×0.88 | ×1.05 |
+| Boss health | ×0.7 | ×0.88 | ×0.95 |
+| Enemy speed | ×0.82 | ×0.94 | ×1.02 |
+| Telegraph time | ×1.45 | ×1.15 | ×0.96 |
 | Heal per vial | 2 | 1 | 1 |
 | Time limits and chases | ×1.3 | ×1 | ×0.85 |
 
-Intense bosses keep full health but attack faster with shorter warnings: harder without being longer.
+Intense bosses attack faster with shorter warnings rather than lasting longer. Foes gain 8% health
+per area; the Forge's Blade gives 12% damage per level, so a player who upgrades keeps pace and the
+later areas feel as hard as the early ones.
+
+## Growing stronger
+
+| System | Rule |
+| --- | --- |
+| Plasma | Every foe drops it (3 + 1.5 per area; elites ×3); minibosses 60 + 20 per area, bosses 150 + 50 per area. Carried plasma is banked at each lantern and the goal; a fall loses what was carried. |
+| Diamonds | The first defeat of a guardian (2 for a boss, 1 for a miniboss), a chest every fourth level, and every trial's grand chest. |
+| Forge upgrades | Blade (8 levels, +12% damage each), Armour (4, +1 mask each), Lumen Core (4, +20 Lumen), Essence Flask (3, +1 vial). Later levels also cost diamonds. |
+| Swords | Tide Blade (start), Ember Fang, Stormcaller, Reefbreaker, Hollow Edge, Moonbrand. Each has power, reach and speed, and turns the charged strike into its art. Each unlocks for purchase on reaching its area. |
+| Techniques | Third Cut (third quick strike ×1.5 and wider), Rising Cut (an upward strike lifts you, ×1.25), Dash Strike (strike out of a dash ×1.5), Plunge (down-strike ×2 with a burst on landing). |
+| Chests | One on every level, struck open: plasma; a diamond every fourth level; a relic every third. |
+| Relics | One-time Thunder Seal (lightning on every foe in sight), Frost Seal (freeze them), Tide Draught (full heal), Nova Shard (a blast all around). |
+| Trials | Arches on levels 2, 5 and 8 of each area (not on chases, timed or flooded levels). Push up to step through to a fenced fight of elites past the goal; win it for a grand chest (plasma, diamonds, a relic). A fall returns you to your lantern. |
 
 ## Presentation
 

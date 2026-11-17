@@ -3,8 +3,8 @@
 > The Tide King drowned the moon and scattered the Tideborn's powers across the deep.
 > Take them back — one guardian at a time.
 
-Tidewalker is a fast, boss-driven 2D action-platformer for phones and the browser. You play a small
-luminous Tideborn with a light-blade, crossing ten drowned areas of ten levels each, beating twenty
+Tidewalker is a fast, boss-driven 2D action-platformer for phones, tablets, Mac, Windows and the
+browser. You play a small Tideborn knight with a sword of light, crossing ten drowned areas of ten levels each, beating twenty
 optional guardians and ten area bosses, and earning back the movement and powers the fall took.
 It is written in TypeScript on PixiJS, runs offline, and needs no account, backend, ads or analytics.
 Every picture is painted by code at start-up and every sound is synthesised while you play, so the
@@ -33,10 +33,22 @@ repository contains no binary art or audio and nothing borrowed.
 - **Fourteen enemy kinds** with distinct answers: shellbacks block from the front, thornblooms are
   armoured until they open, burrowers surface under you, sentinels duel at range, broodmothers
   spawn mites, voidlings blink.
+- **Swords you can see.** The Tideborn carries its sword in hand; every swing is a real arc with
+  a trail of light, and struck foes squash, spark and throw up damage numbers.
+- **Plasma, diamonds and the Forge.** Every foe drops plasma (banked at lanterns, lost on a fall);
+  guardians, chests and trials give diamonds. Spend them at the Forge on Blade, Armour, Lumen
+  Core and Essence Flask upgrades, six swords (each turning the charged strike into its own art:
+  Tide Wave, Flame Arc, Chain Bolt, Thorn Spin, Rift, Radiance) and four techniques (Third Cut,
+  Rising Cut, Dash Strike, Plunge).
+- **Chests and relics.** A chest on every level; some hold relics — one-time Thunder, Frost,
+  Draught and Nova powers.
+- **Trials.** Glowing arches on levels 2, 5 and 8 of each area open onto hard elite fights with a
+  grand chest behind them. Fall there and you are back at your lantern.
 - **Lumen and Essence.** Lumen powers glow, Pulse, charged strikes and gifts and refills over time.
   Landing hits fills Tide Essence; hold Mend on safe ground to spend a vial and heal.
-- **Fair difficulty.** Gentle (two extra masks, longer warnings, softer foes), Standard, Intense
-  (shorter warnings, faster and tougher foes). No setting removes a boss or a fight.
+- **Fair difficulty.** Six masks to start; Gentle (two more, longer warnings, softer foes),
+  Standard, Intense (shorter warnings, faster and tougher foes). No setting removes a boss or a
+  fight. Area scaling is gentle; Forge upgrades are how you keep pace.
 - **Also:** 20 Memory Shells that unlock a wordless picture-story, boss rematches from the map,
   best times, and Drift — an endless, danger-free shore.
 - **Accessibility:** text size, reduced motion, screen-shake toggle, visual cues for sounds,
@@ -55,27 +67,45 @@ repository contains no binary art or audio and nothing borrowed.
 | Lumen Pulse (tap) · Glow (hold) | Light | V / L / E |
 | Mend | Hold Mend | H / R |
 | Use gift · switch gift | Gift · tap the gift badge | F · Q |
+| Use relic · switch relic | Tap the relic badge | G · T |
+| Enter a trial arch | Push the stick up | ↑ |
 | Pause | Pause button | Esc / P |
 
-The pad mirrors for left-handed play (Settings → Controls).
+Gamepads (standard layout): left stick or d-pad to move, A jump, X strike (hold for the art),
+B dash, Y light, RB mend, LB gift, RT relic, Start pause, Select switch gift; the d-pad and A/B
+also drive the menus. The pad mirrors for left-handed play (Settings → Controls). Portrait and
+landscape both work.
 
 ## Run it locally
 
-Requires Node.js 20 or newer.
+Requires Node.js 22 or newer.
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173 — open on a phone via your LAN IP, or use a mobile viewport
+npm run dev          # http://localhost:5173
+npm run dev:lan      # the same, reachable from a phone on your Wi-Fi (use the Network: address)
 ```
+
+## Mac, Windows, Android, iOS
+
+```bash
+npm run desktop:start    # run as a desktop app (Electron) right now
+npm run desktop:mac      # desktop/release/Tidewalker-2.0.0-arm64.dmg and Tidewalker-2.0.0.dmg
+npm run desktop:win      # desktop/release/Tidewalker-2.0.0-win.zip
+npm run mobile:android   # needs Android Studio; opens the Android project
+npm run mobile:ios       # needs Xcode; opens the iOS project
+```
+
+Details, signing and store notes: [docs/PACKAGING.md](docs/PACKAGING.md).
 
 ## Test it
 
 ```bash
 npm run typecheck    # TypeScript strict mode
 npm run lint         # ESLint
-npm test             # 151 unit and integration tests, including bot playthroughs of every level
+npm test             # 176 unit and integration tests, including bot playthroughs of every level
 npx playwright install chromium   # once
-npm run test:e2e     # 40 end-to-end tests: real touch input, phone to desktop viewports, offline
+npm run test:e2e     # 47 end-to-end tests: real touch input, portrait and landscape phones to desktop, offline
 npm run check        # typecheck + lint + unit tests + production build
 npm run verify:levels   # table of the bot's run through every level on every difficulty
 ```
@@ -96,12 +126,6 @@ npm run preview      # serves dist/ at http://localhost:4173
 (see `.env.example`). The build is about 0.85 MB (≈ 200 kB gzipped) and makes no network requests
 after the first load.
 
-## Package for Android and iOS
-
-The project is ready to wrap with Capacitor (`capacitor.config.json` is included). Steps, icons,
-splash screens, haptics and signing are in [docs/PACKAGING.md](docs/PACKAGING.md); store metadata is
-in [STORE_PREP.md](STORE_PREP.md).
-
 ## Architecture
 
 ```
@@ -112,7 +136,7 @@ src/
     entities/             player movement and combat, enemies, bosses and minibosses, props
     systems/              combat resolution, arenas, hazards, level rules, terrain, tide
     levels/               builder DSL, motifs, tutorial, areas a01–a10, progression, Drift generator
-    input/                Controls (pure) and touch-pad / keyboard binding
+    input/                Controls (pure), gamepad reader, touch-pad / keyboard binding
     audio/                AudioDirector (state → mix, pure) and Web Audio engine
     effects/              PixiJS renderer, views, combat effects, lightmap, particles, haptics
     save/                 localStorage save (v2) with sanitising loader
@@ -120,7 +144,8 @@ src/
   assets/                 procedural sprite atlas, backgrounds, score data, palettes, vignettes
 tests/                    Vitest unit and integration tests
 e2e/                      Playwright end-to-end tests
-scripts/                  level verification, bot tracing, icons, store screenshots
+scripts/                  level verification, bot tracing, mobile builds, icons, store screenshots
+desktop/                  Electron shell for Mac/Windows (own package.json)
 docs/                     architecture, audio direction, packaging, screenshots
 ```
 
@@ -132,4 +157,5 @@ design intent in [DESIGN.md](DESIGN.md); area-by-area notes in [LEVELS.md](LEVEL
 ## Licence
 
 All code, art and audio in this repository are original to this project. No third-party assets are
-included. Runtime dependency: [PixiJS](https://pixijs.com) (MIT).
+included. Runtime dependency: [PixiJS](https://pixijs.com) (MIT). Packaging only: Electron and
+electron-builder (in `desktop/`), Capacitor (dev dependency).

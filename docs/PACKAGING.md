@@ -1,39 +1,49 @@
-# Packaging for Android and iOS
+# Packaging for Mac, Windows, Android and iOS
 
-Tidewalker is a static web app, so the native apps are thin wrappers around `dist/`.
-These steps use [Capacitor](https://capacitorjs.com). The repository includes
-`capacitor.config.json`; the generated `android/` and `ios/` folders are git-ignored and can be
-recreated at any time.
+Tidewalker is a static web app; every native build is a thin wrapper around `dist/`.
 
-Nothing here has been run against the stores from this repository: no native project has been
-generated or submitted. Treat this as a prepared checklist.
+| Platform | Wrapper | Command | Output | Needs |
+| --- | --- | --- | --- | --- |
+| Any browser | — | `npm run build && npm run preview` | `dist/` | Node 22 |
+| Phone over Wi-Fi | — | `npm run dev:lan` | a `Network:` address to open on the phone | same Wi-Fi |
+| macOS | Electron (`desktop/`) | `npm run desktop:mac` | `desktop/release/*.dmg` (Apple Silicon and Intel) | — |
+| Windows | Electron (`desktop/`) | `npm run desktop:win` | `desktop/release/Tidewalker-2.0.0-win.zip` | — (built on the Mac) |
+| Run the desktop app now | Electron | `npm run desktop:start` | a window | — |
+| Android | Capacitor 8 | `npm run mobile:android` | opens Android Studio | Android Studio (SDK 35+), JDK 21 |
+| iOS | Capacitor 8 | `npm run mobile:ios` | opens Xcode | Xcode 16+, an Apple ID for a device |
 
-## Prerequisites
+`npm run mobile:android -- run` / `npm run mobile:ios -- run` installs straight onto a connected
+device or a running emulator/simulator instead of opening the IDE.
 
-- Node.js 20+
-- Android: Android Studio (SDK 34+), JDK 17
-- iOS: a Mac with Xcode 15+, CocoaPods, an Apple Developer account
+## Desktop (Mac and Windows)
 
-## 1. Build the web app
+The desktop app lives in `desktop/` with its own `package.json`, so Electron never becomes a
+dependency of the game. `desktop/prepare.mjs` copies `dist/` into `desktop/web/`;
+`desktop/main.cjs` opens one window and serves that build from an `app://` origin (modules,
+storage and the service worker behave as on the web). F11 / ⌃⌘F toggles full screen.
 
-```bash
-npm install
-npm run check        # typecheck, lint, tests, build
-```
+- The Mac build is **not signed or notarised**. On first launch, right-click the app → Open.
+  For distribution, set `mac.identity` in `desktop/package.json` and notarise with your Apple
+  Developer account.
+- The Windows build is a portable zip: unzip and run `Tidewalker.exe`. It is not signed, so
+  SmartScreen will warn. For an installer, change the `win.target` to `nsis` (building that on a
+  Mac needs Wine, or build on Windows).
+- Saves live in the app's own storage, separate from the browser's.
 
-## 2. Add Capacitor
+## Android and iOS
 
-```bash
-npm i @capacitor/core @capacitor/android @capacitor/ios @capacitor/haptics @capacitor/splash-screen
-npm i -D @capacitor/cli @capacitor/assets
-npx cap add android
-npx cap add ios
-npx cap sync
-```
+`capacitor.config.json` is at the project root; `scripts/mobile.mjs` builds the web app, creates
+`android/` or `ios/` on first use (they are git-ignored), syncs and opens the IDE.
+Change `appId` in `capacitor.config.json` to a bundle id you own before the first build.
 
-Change `appId` in `capacitor.config.json` to a bundle id you own before the first `cap add`.
+1. Android: install Android Studio, open it once to install the SDK, then
+   `npm run mobile:android`. Press Run, or Build → Build APK(s) for an installable file.
+2. iOS: install Xcode from the App Store, open it once, then `npm run mobile:ios`. Pick your
+   iPhone or a simulator and press Run; a free Apple ID is enough to run on your own phone.
 
-## 3. Icons and splash screens
+Both play in portrait or landscape, with the touch pad; a Bluetooth controller works too.
+
+## Icons and splash screens
 
 Source art is `public/icon.svg`; `npm run icons` renders the PNG set into `public/icons/`
 (including a 1024 px master and a maskable icon).
@@ -51,7 +61,7 @@ Guidance: keep the creature inside the central 66% of the icon (Android adaptive
 circle or squircle). The splash should be the plain night colour with the small light in the
 centre, so it dissolves into the title screen.
 
-## 4. Platform settings
+## Platform settings
 
 **Both**
 - Portrait only.
@@ -68,7 +78,7 @@ centre, so it dissolves into the title screen.
 - Status bar hidden; "Requires full screen" on.
 - No usage-description strings are needed: the game uses no camera, microphone, location or tracking.
 
-## 5. Haptics bridge
+## Haptics bridge
 
 iOS Safari has no Vibration API, so in the browser iPhones get no haptics. In the native wrapper,
 give the game a bridge. Create `src/native-haptics.ts` in the wrapper build (or inject it as a
@@ -96,7 +106,7 @@ const impact: Record<string, ImpactStyle> = {
 `src/game/effects/haptics.ts` looks for `window.TidewalkerHaptics` and uses it when present; the
 in-game Haptics toggle still applies.
 
-## 6. Run on devices
+## Run on devices
 
 ```bash
 npm run build && npx cap sync
@@ -106,7 +116,7 @@ npx cap run ios          # or: npx cap open ios
 
 Work through the Manual section of `QA_CHECKLIST.md` on real hardware.
 
-## 7. Release builds
+## Release builds
 
 **Android**
 1. Create an upload keystore (keep it out of git; `.gitignore` already excludes `*.jks`, `*.keystore`):

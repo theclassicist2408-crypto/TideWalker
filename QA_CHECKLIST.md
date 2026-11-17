@@ -12,6 +12,9 @@ run; "Manual" items need a person with a real device and are **not** covered by 
 | Enemies | Wind-up before every hit, lobbed shots, hidden burrowers, patrol leash | `tests/combat.test.ts` |
 | Arenas | Lock, waves in order, clear and reopen, survival timer, reset after a fall | `tests/combat.test.ts` |
 | Gifts | Ten distinct gifts; each usable, then on cooldown; Lumen cost enforced | `tests/combat.test.ts` |
+| Economy | Plasma drops by rank, banking at lanterns, loss on a fall, none in the tutorial; chests open once and stay open; trials placed past the goal, entered by pushing up, fenced, exited only after the fight, a fall returns to the lantern, no goal from inside; every sword's art; Third Cut and Rising Cut; relics spent once; Forge prices, caps and loadout; sword and technique unlocks; sanitising | `tests/economy.test.ts` |
+| Gamepad | Presses on the frame only, held-at-connect ignored, non-standard devices ignored, dead zone and d-pad | `tests/gamepad.test.ts` |
+| Forge (browser) | Buying an upgrade, refusing an unaffordable one, a bought sword carried into play | `e2e/menus.spec.ts` |
 | Bosses | Ten bosses in area order with 2+ phases and rising pressure; unique gifts; 20+ minibosses, 2+ per area; each guardian placed exactly once; bosses guard level 10; telegraph before every attack; phase stagger; defeat clears hazards and opens the arena; difficulty scaling; reset after a fall; every phase of every boss runs without fault | `tests/bosses.test.ts` |
 | Level data | 10 areas × 10 levels with the designed names; unique twists; deterministic build; 12+ enemy kinds all used; 2 shells per area with one hidden; lanterns ≤ 2700 px apart and at every boss door; sensible length | `tests/levels.test.ts` |
 | Progression | Every ability returned once at its scheduled level; no level requires an ability not yet held; optional guardians grant upgrades; loadout grows by area; the tutorial teaches every mechanic | `tests/levels.test.ts` |
@@ -24,16 +27,20 @@ run; "Manual" items need a person with a real device and are **not** covered by 
 | Touch play | Real touch events on the pad: stick runs, Jump leaps, Strike swings | `e2e/play.spec.ts` |
 | Flow | Begin → tutorial with HUD and pad; pause/resume; tutorial completion saved; respawn at the lantern | `e2e/play.spec.ts` |
 | Menus | Ten areas and locks; level unlocks, best time, Onward; boss rematch from the map; settings persist (difficulty, handedness); Memories and Credits | `e2e/menus.spec.ts` |
-| Layout / access | Title, pad, pause, HUD, boss bar and settings on 320×568, 393×851, 430×932, 820×1180, 1280×800; targets ≥ 44 px; no overlaps; XL text; every button named | `e2e/layout.spec.ts` |
+| Layout / access | Title, pad, pause, HUD, boss bar and settings on 320×568, 393×851, 430×932, 844×390 (sideways), 820×1180, 1280×800; targets ≥ 44 px; no overlaps; XL text; every button named | `e2e/layout.spec.ts` |
 | Desktop | Keyboard strike, run, jump, pause; focusable menus | `e2e/desktop.spec.ts` |
 | Performance (browser) | Frame-rate floor and fixed scene-graph/DOM size through a boss fight; fast load; no external requests | `e2e/performance.spec.ts` |
 | Offline | Reload and play with the network off after the first visit | `e2e/performance.spec.ts` |
 | Console | Any console error or uncaught exception fails the e2e test that produced it | `e2e/support.ts` |
 
-Latest results: **151 / 151** unit and integration tests, **40 / 40** end-to-end tests, lint and
+Latest results: **176 / 176** unit and integration tests, **47 / 47** end-to-end tests, lint and
 typecheck clean, production build succeeds; the verification bot passes all 323 level runs.
 
 ## Manual — to do on real hardware before release
+
+- [ ] Desktop: launch the .dmg on Apple Silicon and Intel Macs and the Windows zip on Windows 10/11;
+      keyboard and an Xbox / PlayStation controller; full screen; resize.
+- [ ] Android and iOS builds from `npm run mobile:android` / `mobile:ios` on real phones.
 
 None of these has been done on a physical device yet.
 
