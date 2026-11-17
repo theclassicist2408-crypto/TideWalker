@@ -92,7 +92,7 @@ export class GameRenderer {
     this.bubbles = new ParticleLayer(gfx, 160, false);
 
     const glow = new Container();
-    glow.addChild(this.entities.glow, this.combat.glow, this.creature.halo, this.sparks.container);
+    glow.addChild(this.entities.glow, this.combat.glow, this.creature.halo, this.creature.trail, this.sparks.container);
     this.worldC.addChild(
       this.terrain.back,
       this.water.g,
@@ -182,6 +182,16 @@ export class GameRenderer {
     this.camera.snap(w.player.x, w.player.y, w.minX - 10, w.level.width);
   }
 
+  /** Damage numbers: one particle per digit, floating up off the target. */
+  private number(x: number, y: number, n: number): void {
+    const digits = n >= 100 ? 3 : n >= 10 ? 2 : 1;
+    const vx = (Math.random() - 0.5) * 30;
+    for (let i = 0; i < digits; i++) {
+      const d = Math.floor(n / 10 ** (digits - 1 - i)) % 10;
+      this.motes.spawn({ frame: `n${d}`, x: x + (i - (digits - 1) / 2) * 7, y, vx, vy: -70, gravity: 90, ttl: 0.75, s0: 8, s1: 8, alpha: 1 });
+    }
+  }
+
   /** Turns a simulation event into particles, squash and camera feedback. */
   onEvent(e: GameEvent): void {
     const { x, y, v } = e;
@@ -237,18 +247,29 @@ export class GameRenderer {
         const p = this.world?.player;
         if (!p) break;
         const big = e.type === 'chargeSlash';
-        const rot = v === 1 ? -Math.PI / 2 : v === 2 ? Math.PI / 2 : p.facing > 0 ? 0 : Math.PI;
-        const reach = big ? 60 : 34;
-        sp.spawn({ frame: 'slash', x: x + Math.cos(rot) * reach * 0.6, y: y + Math.sin(rot) * reach * 0.6, ttl: big ? 0.24 : 0.14, s0: big ? 96 : 60, s1: big ? 120 : 70, alpha: 0.95, tint: big ? LIGHT.creatureWarm : LIGHT.blade, rotation: rot });
-        if (big) cam.shake(0.18);
+        // The sword itself draws the swing; a charged strike also throws a crescent of light.
+        cr.startSwing(big ? 0 : v, big);
+        if (big) {
+          const rot = p.facing > 0 ? 0 : Math.PI;
+          sp.spawn({ frame: 'slash', x: x + Math.cos(rot) * 30, y, vx: Math.cos(rot) * 120, ttl: 0.26, s0: 90, s1: 120, alpha: 0.8, tint: LIGHT.creatureWarm, rotation: rot });
+          cam.shake(0.18);
+        }
         break;
       }
       case 'chargeReady':
         sp.spawn({ frame: 'ring', x, y, ttl: 0.3, s0: 60, s1: 16, alpha: 0.8, tint: LIGHT.creatureWarm });
         break;
-      case 'hit':
-        for (let i = 0; i < 5; i++) sp.spawn({ frame: 'spark', x, y, vx: (rnd() - 0.5) * 260, vy: (rnd() - 0.5) * 260, drag: 4, ttl: 0.28, s0: 10, s1: 2, alpha: 0.95, tint: 0xffffff });
+      case 'hit': {
+        // A cut across the target, sparks, and the damage rising off it.
+        const p = this.world?.player;
+        const side = p && p.x > x ? -1 : 1;
+        sp.spawn({ frame: 'cut', x, y, ttl: 0.18, s0: 30, s1: 52, alpha: 1, tint: 0xffffff, rotation: side * (0.5 + rnd() * 0.5) });
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.16, s0: 6, s1: 34, alpha: 0.7, tint: LIGHT.blade });
+        for (let i = 0; i < 7; i++) sp.spawn({ frame: 'spark', x, y, vx: side * (60 + rnd() * 240), vy: (rnd() - 0.6) * 260, drag: 4, ttl: 0.3, s0: 9, s1: 2, alpha: 0.95, tint: i % 2 ? 0xffffff : LIGHT.creatureWarm });
+        if (v > 0) this.number(x, y - 12, Math.round(v));
+        cam.shake(0.04);
         break;
+      }
       case 'clang':
         sp.spawn({ frame: 'ring', x, y, ttl: 0.22, s0: 8, s1: 46, alpha: 0.9, tint: 0xcfd8ff });
         break;

@@ -131,6 +131,7 @@ export function hitEnemy(w: World, e: EnemyState, dmg: number, fromX: number, di
   }
   if (e.hp <= 0) {
     e.alive = false;
+    w.emit('hit', e.x, e.y, dmg);
     w.player.lumen = Math.min(w.load.lumenMax, w.player.lumen + 6);
     w.emit('kill', e.x, e.y, s.r);
     return 'killed';

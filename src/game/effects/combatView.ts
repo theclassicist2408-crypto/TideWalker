@@ -149,7 +149,9 @@ export class CombatLayer {
       v.body.texture = gfx.tex(`e_${e.kind}`);
       v.body.position.set(x + shake, y + (e.kind === 'gloomwing' || e.kind === 'stormjelly' ? Math.sin(t * 6 + i) * 2 : 0));
       const size = (s.r / 13) * (e.elite ? 1.3 : 1) * (wind ? 1.08 : 1);
-      v.body.scale.set(inv * size * (e.facing >= 0 ? 1 : -1), inv * size * (e.mode === 'stun' ? 0.85 : 1));
+      // A struck foe squashes away from the blow for a moment.
+      const hitK = clamp(e.flash / 0.12, 0, 1);
+      v.body.scale.set(inv * size * (e.facing >= 0 ? 1 : -1) * (1 + 0.35 * hitK), inv * size * (e.mode === 'stun' ? 0.85 : 1) * (1 - 0.25 * hitK));
       // Hidden things are almost invisible: a mound for the burrower, a shimmer for the voidling.
       const lit = clamp(1.3 - d2(e.x - p.x, e.y - p.y) / (w.lightRadius * 1.2), 0, 1);
       let a = Math.min(1, e.spawnT * 2);
@@ -177,7 +179,8 @@ export class CombatLayer {
       const size = (b.def.r * 2.6) / 96;
       this.boss.texture = gfx.tex(`boss${b.def.look}`);
       this.boss.position.set(x + (tele ? Math.sin(t * 60) * 2 : 0), y + Math.sin(t * 2.4) * 2);
-      this.boss.scale.set(inv * size * (b.facing >= 0 ? 1 : -1) * (tele ? 1.06 : 1), inv * size * (b.mode === 'recover' ? 0.9 : 1));
+      const bossHit = clamp(b.flash / 0.12, 0, 1);
+      this.boss.scale.set(inv * size * (b.facing >= 0 ? 1 : -1) * (tele ? 1.06 : 1) * (1 + 0.12 * bossHit), inv * size * (b.mode === 'recover' ? 0.9 : 1) * (1 - 0.1 * bossHit));
       this.boss.tint = b.flash > 0 ? 0xffffff : mixColor(b.def.tint, 0xffffff, b.mode === 'recover' ? 0.4 : 0);
       this.boss.alpha = dead ? Math.max(0, 1 - b.t * 0.8) : b.mode === 'intro' ? clamp(1 - b.t / 1.6, 0.15, 1) : 1;
       this.aura.position.set(x, y);

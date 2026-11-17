@@ -1,8 +1,9 @@
 import type { AbilityId, Difficulty, RewardId } from './types';
 
 /** Width of the virtual viewport in world units. Height follows the screen aspect ratio. */
-export const VIEW_W = 400;
-export const VIEW_MIN_H = 620;
+/** World width that fits a portrait phone screen: smaller means a closer camera. */
+export const VIEW_W = 280;
+export const VIEW_MIN_H = 470;
 export const FIXED_DT = 1 / 60;
 export const MAX_STEPS_PER_FRAME = 5;
 

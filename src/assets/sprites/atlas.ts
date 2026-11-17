@@ -44,6 +44,60 @@ function seeded(seed: number): () => number {
   };
 }
 
+/** How each sword is drawn: blade colours, guard and length. Pointing up, grip at the bottom. */
+const SWORD_LOOKS: Record<string, { blade: [string, string]; edge: string; guard: string; len: number; width: number; curve: number }> = {
+  tide: { blade: ['#cfefff', '#ffffff'], edge: '#8ff0ff', guard: '#ffd98a', len: 30, width: 4, curve: 0 },
+  ember: { blade: ['#ff9a5a', '#ffe0a0'], edge: '#ffcf70', guard: '#5a2a1a', len: 31, width: 5, curve: 0.5 },
+  storm: { blade: ['#b8c8ff', '#f4f8ff'], edge: '#e6f0ff', guard: '#40507a', len: 34, width: 3, curve: 0 },
+  coral: { blade: ['#ff9ab8', '#ffe0ea'], edge: '#ffd0e0', guard: '#2a7a80', len: 29, width: 6, curve: -0.4 },
+  void: { blade: ['#5a3a9a', '#d8b8ff'], edge: '#c890ff', guard: '#1a0f2a', len: 33, width: 4, curve: 0.8 },
+  crown: { blade: ['#ffe8a0', '#ffffff'], edge: '#fff4c8', guard: '#c08a2a', len: 36, width: 5, curve: 0 },
+};
+
+const SWORD_PAINTERS = Object.fromEntries(
+  Object.entries(SWORD_LOOKS).map(([id, k]) => [
+    `sword_${id}`,
+    {
+      w: 16,
+      h: 44,
+      paint: (c: Ctx, w: number, h: number) => {
+        const cx = w / 2;
+        const base = h - 8;
+        const tip = base - k.len;
+        // Blade: a slight curve for the stranger swords.
+        c.beginPath();
+        c.moveTo(cx - k.width / 2, base);
+        c.quadraticCurveTo(cx - k.width / 2 + k.curve * 3, (base + tip) / 2, cx + k.curve * 2, tip);
+        c.quadraticCurveTo(cx + k.width / 2 + k.curve * 3, (base + tip) / 2, cx + k.width / 2, base);
+        c.closePath();
+        c.fillStyle = linear(c, cx - 3, 0, cx + 3, 0, [
+          [0, k.blade[0]],
+          [1, k.blade[1]],
+        ]);
+        c.fill();
+        c.strokeStyle = k.edge;
+        c.lineWidth = 0.8;
+        c.stroke();
+        // Fuller line down the middle.
+        c.strokeStyle = 'rgba(255,255,255,0.7)';
+        c.beginPath();
+        c.moveTo(cx, base - 2);
+        c.lineTo(cx + k.curve, tip + 6);
+        c.stroke();
+        // Guard, grip, pommel.
+        c.fillStyle = k.guard;
+        c.fillRect(cx - 5.5, base, 11, 2.4);
+        c.fillStyle = '#2a2230';
+        c.fillRect(cx - 1.2, base + 2.4, 2.4, 4);
+        c.fillStyle = k.guard;
+        c.beginPath();
+        c.arc(cx, base + 7, 1.6, 0, TAU);
+        c.fill();
+      },
+    },
+  ]),
+);
+
 const painters: Record<string, { w: number; h: number; paint: Painter }> = {
   /** Soft falloff used for every light, halo and mote. */
   soft: {
@@ -1168,6 +1222,163 @@ Object.assign(painters, {
       c.fill();
     },
   },
+  /** The Tideborn's cloak and body, facing right: a short hooded mantle over a slim frame. */
+  heroCloak: {
+    w: 26,
+    h: 24,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.translate(w / 2, h / 2);
+      // Mantle, swept back.
+      c.beginPath();
+      c.moveTo(5, -9);
+      c.bezierCurveTo(9, -6, 9, 3, 7, 9);
+      c.lineTo(-3, 11);
+      c.bezierCurveTo(-8, 10, -12, 6, -12, 2);
+      c.bezierCurveTo(-11, -4, -6, -9, 0, -10);
+      c.closePath();
+      c.fillStyle = linear(c, -12, 0, 9, 0, [
+        [0, '#123a4c'],
+        [0.6, '#1f6278'],
+        [1, '#2f8aa0'],
+      ]);
+      c.fill();
+      c.strokeStyle = 'rgba(160,240,255,0.55)';
+      c.lineWidth = 1;
+      c.stroke();
+      // Hem trim: a band of warm light, the Tideborn's mark.
+      c.strokeStyle = '#ffd98a';
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.moveTo(-11, 4);
+      c.bezierCurveTo(-8, 9, -2, 10.5, 7, 8.6);
+      c.stroke();
+      // Chest plate.
+      c.fillStyle = linear(c, 0, -8, 6, 6, [
+        [0, '#f4efe6'],
+        [1, '#a9b4bc'],
+      ]);
+      c.beginPath();
+      c.ellipse(2.5, -1, 4, 5.5, 0.15, 0, TAU);
+      c.fill();
+      c.fillStyle = '#8ff0ff';
+      c.beginPath();
+      c.arc(3, -1.5, 1.4, 0, TAU);
+      c.fill();
+    },
+  },
+  /** Shell helm with a fin crest and a dark visor that glows from within. Faces right. */
+  heroHelm: {
+    w: 24,
+    h: 22,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.translate(w / 2, h / 2 + 1);
+      // Fin crest.
+      c.fillStyle = linear(c, -8, -10, 2, -4, [
+        [0, 'rgba(143,240,255,0.2)'],
+        [1, '#8ff0ff'],
+      ]);
+      c.beginPath();
+      c.moveTo(1, -7);
+      c.quadraticCurveTo(-4, -13, -10, -10);
+      c.quadraticCurveTo(-6, -8, -4, -4);
+      c.closePath();
+      c.fill();
+      // Dome.
+      c.beginPath();
+      c.ellipse(0, 0, 8.5, 8, 0, 0, TAU);
+      c.fillStyle = radial(c, 2, -3, 10, [
+        [0, '#ffffff'],
+        [0.55, '#e9e4da'],
+        [1, '#9aa6b0'],
+      ]);
+      c.fill();
+      c.strokeStyle = 'rgba(255,255,255,0.8)';
+      c.lineWidth = 0.8;
+      c.stroke();
+      // Shell ridges.
+      c.strokeStyle = 'rgba(90,110,130,0.45)';
+      c.lineWidth = 0.8;
+      for (const a of [-0.9, -0.3, 0.3]) {
+        c.beginPath();
+        c.moveTo(-6, a * 6);
+        c.quadraticCurveTo(-1, a * 9 - 2, 4, a * 7 - 4);
+        c.stroke();
+      }
+      // Visor.
+      c.fillStyle = '#0d1426';
+      c.beginPath();
+      c.moveTo(1, -2.5);
+      c.quadraticCurveTo(9.5, -3, 8.5, 2);
+      c.quadraticCurveTo(7, 5, 1.5, 3.5);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#fff2c4';
+      c.beginPath();
+      c.ellipse(5.2, 0, 1.3, 1.9, 0, 0, TAU);
+      c.ellipse(8, 0.4, 0.9, 1.5, 0, 0, TAU);
+      c.fill();
+    },
+  },
+  heroFoot: {
+    w: 8,
+    h: 6,
+    paint: (c: Ctx) => {
+      c.fillStyle = '#0f2a38';
+      c.beginPath();
+      c.ellipse(4, 3, 3.6, 2.4, 0, 0, TAU);
+      c.fill();
+      c.fillStyle = 'rgba(160,240,255,0.5)';
+      c.fillRect(1.5, 1, 4, 0.8);
+    },
+  },
+  heroHand: {
+    w: 6,
+    h: 6,
+    paint: (c: Ctx) => {
+      c.fillStyle = '#e9e4da';
+      c.beginPath();
+      c.arc(3, 3, 2.2, 0, TAU);
+      c.fill();
+    },
+  },
+  /** Digits for damage numbers, white with a dark edge so they read on any background. */
+  ...Object.fromEntries(
+    Array.from({ length: 10 }, (_, d) => [
+      `n${d}`,
+      {
+        w: 10,
+        h: 14,
+        paint: (c: Ctx, w: number, h: number) => {
+          c.font = 'bold 13px system-ui, -apple-system, sans-serif';
+          c.textAlign = 'center';
+          c.textBaseline = 'middle';
+          c.lineWidth = 3;
+          c.strokeStyle = 'rgba(20,10,30,0.85)';
+          c.strokeText(String(d), w / 2, h / 2 + 1);
+          c.fillStyle = '#ffffff';
+          c.fillText(String(d), w / 2, h / 2 + 1);
+        },
+      },
+    ]),
+  ),
+  /** A thin cut mark left where a blade passes through a foe. */
+  cut: {
+    w: 48,
+    h: 10,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.fillStyle = linear(c, 0, 0, w, 0, [
+        [0, 'rgba(255,255,255,0)'],
+        [0.5, 'rgba(255,255,255,1)'],
+        [1, 'rgba(255,255,255,0)'],
+      ]);
+      c.beginPath();
+      c.moveTo(0, h / 2);
+      c.quadraticCurveTo(w / 2, 0, w, h / 2);
+      c.quadraticCurveTo(w / 2, h * 0.75, 0, h / 2);
+      c.fill();
+    },
+  },
+  ...SWORD_PAINTERS,
   /**
    * Arena ward: a curtain of red-violet light that seals a fight. Downward chevrons give it a
    * shape of its own, so it reads as a barrier without relying on its colour.
