@@ -360,7 +360,9 @@ function integrate(w: World, dt: number): void {
     const dir = dx > 0 ? 1 : -1;
     const lead = nx + dir * P.halfW;
     const allow = P.stepUp + Math.abs(dx) * 1.6;
-    let blocked = ground.at(lead) < feet0 - allow || ceil.at(lead) > head0 + allow;
+    // The face of a cave roof stops the creature but gives it nothing to cling to (it has no top).
+    const roofFace = ceil.at(lead) > head0 + allow;
+    let blocked = ground.at(lead) < feet0 - allow || roofFace;
     if (!blocked) {
       for (let i = 0; i < w.blocks.length; i++) {
         const b = w.blocks[i];
@@ -384,7 +386,7 @@ function integrate(w: World, dt: number): void {
     }
     if (blocked) {
       nx = p.x;
-      touched = dir;
+      touched = roofFace ? 0 : dir;
       p.vx = 0;
       if (p.dashT > 0) p.dashT = 0;
       if (p.hookT > 0) p.hookT = 0;

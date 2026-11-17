@@ -47,10 +47,11 @@ export function tutorialLevel(): LevelData {
   // Water: swim, then dive under a sunken wall. The pool is the lowest ground in the level.
   b.step(140).flat(130).step(140).flat(120);
   b.flat(100).hint('swim', 90, 300);
-  b.basin(520, 190, 0.18);
-  b.block(280, 26, 40, 110);
+  b.basin(520, 190, 0.18, (bb) => {
+    bb.block(280, 26, 40, 110);
+    bb.via(300, -150, { swim: true }).via(220, -150, { swim: true });
+  });
   b.hint('dive', 400, 240);
-  b.via(300, -150, { swim: true }).via(220, -150, { swim: true });
   b.fireflies(120, -20, 3, 24);
   bench(b, 200);
 

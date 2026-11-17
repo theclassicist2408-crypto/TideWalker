@@ -155,7 +155,7 @@ export class LevelBuilder {
   }
 
   /** Pool with sloped banks: walk in, swim across, walk out. */
-  basin(width: number, depth: number, bank = 0.28): this {
+  basin(width: number, depth: number, bank = 0.28, under?: (b: this) => void): this {
     const b = width * bank;
     const x0 = this.x;
     this.point(x0 + b, this.y + depth);
@@ -164,6 +164,8 @@ export class LevelBuilder {
     this.x += width;
     this.wet.push([x0, this.x]);
     this.wp(x0 + b, this.y + Math.min(depth, 30) - 9, { swim: true });
+    // Anything the swimmer must pass on the way across (a sunken wall to dive under) goes here.
+    if (under) under(this);
     this.wp(this.x - b, this.y + Math.min(depth, 30) - 9, { swim: true });
     this.wp(this.x - 4, this.y - 9);
     return this;

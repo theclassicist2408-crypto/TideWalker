@@ -162,7 +162,7 @@ export function rubble(b: LevelBuilder, n: number): void {
 
 /** A coral door that opens to light. */
 export function bloomDoor(b: LevelBuilder): void {
-  b.flat(170);
+  b.flat(170, false);
   b.bloomGate(40, 400);
   b.flat(60);
 }
@@ -188,9 +188,10 @@ export function tunnel(b: LevelBuilder, len: number, n: number): void {
 
 /** Deep water with a sunken wall across it: the only way on is under. Needs the dive. */
 export function sump(b: LevelBuilder, width: number, depth: number, fish = 0): void {
-  b.basin(width, depth, 0.16);
-  b.block(width * 0.5 + 20, 30, 40, depth * 0.55);
-  b.via(width * 0.5 + 40, -(depth - 30), { swim: true }).via(width * 0.5 - 40, -(depth - 30), { swim: true });
+  b.basin(width, depth, 0.16, (bb) => {
+    bb.block(width * 0.5 + 20, 30, 40, depth * 0.55);
+    bb.via(width * 0.5 + 40, -(depth - 30), { swim: true }).via(width * 0.5 - 40, -(depth - 30), { swim: true });
+  });
   b.fireflies(width * 0.25, -18, 3, 22);
   for (let i = 0; i < fish; i++) b.fish(width * (i % 2 === 0 ? 0.74 : 0.26), Math.round(depth * 0.65), width * 0.16);
 }

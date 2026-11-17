@@ -62,7 +62,7 @@ export type ScreenName = 'title' | 'areas' | 'levels' | 'settings' | 'pause' | '
 const DIFFICULTY_TEXT: Record<Difficulty, string> = {
   gentle: 'Two more lives, longer warnings, softer foes. Every guardian still stands.',
   standard: 'The deep as it was meant to be crossed.',
-  intense: 'One life fewer, shorter warnings, faster foes.',
+  intense: 'Shorter warnings, and foes that are faster and tougher.',
 };
 
 const ENDING_LINES = ['The Tide King is quiet now.', 'The moon he drowned is rising.', 'Everything he took from you, you took back,', 'and the deep gave you more besides.', 'You are home.'];

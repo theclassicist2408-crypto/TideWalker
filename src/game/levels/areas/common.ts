@@ -43,3 +43,8 @@ export function buildLevel(area: AreaInfo, n: number, spec: LevelSpec): LevelDat
 
 /** Shell ids are per area: `aNN-1` and `aNN-2`. */
 export const shellId = (area: number, n: 1 | 2): string => `a${area < 10 ? '0' : ''}${area}-${n}`;
+
+/** Shorthand for writing a level spec. */
+export function L(name: string, line: string, twist: string, build: LevelFn, rules?: LevelRules, finale?: boolean): LevelSpec {
+  return { name, line, twist, build, rules, finale };
+}

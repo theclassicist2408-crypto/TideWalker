@@ -514,7 +514,7 @@ export class World {
 
   /** Multiplier on enemy speed and attack cadence. */
   get pace(): number {
-    return this.diff.enemySpeed * (1 + 0.035 * (this.tier - 1)) * (this.assist ? 0.88 : 1);
+    return this.diff.enemySpeed * (1 + 0.028 * (this.tier - 1)) * (this.assist ? 0.88 : 1);
   }
 
   /** Multiplier on telegraph time. */

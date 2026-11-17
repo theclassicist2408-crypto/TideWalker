@@ -319,7 +319,7 @@ export function updateArenas(w: World, dt: number): void {
     const guardian = w.boss && w.boss.arena === i && w.boss.mode !== 'dead';
     if (a.survive) {
       a.timer -= dt;
-      if (alive < 3 && a.timer > 1) {
+      if (alive < 2 && a.timer > 1) {
         // Survival: the next wave arrives as soon as there is room.
         a.waveNow = (a.waveNow + 1) % Math.max(1, a.waves);
         wakeWave(w, i, a.waveNow);

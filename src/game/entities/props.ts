@@ -137,9 +137,8 @@ export function updateProps(w: World, dt: number): void {
       }
       g.prog = approach(g.prog, open ? 1 : 0, dt * 1.5);
     } else if (!g.open) {
-      const dx = p.x - g.x;
-      const dy = p.y - (g.y - g.h / 2);
-      const near = glowing && dx * dx + dy * dy < 130 * 130;
+      // A door answers light held beside it, anywhere along its height.
+      const near = glowing && Math.abs(p.x - g.x) < 130 && p.y < g.y + 20 && p.y > g.y - g.h - 20;
       g.prog = clamp(g.prog + (near ? dt / GATE_OPEN_TIME : -dt * 0.6), 0, 1);
       if (g.prog >= 1) {
         g.open = true;
@@ -308,7 +307,7 @@ export function pulseProps(w: World, x: number, y: number): void {
   }
   for (const s of w.shells) if (!s.revealed && (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y) < r2) s.revealed = true;
   for (const g of w.gates) {
-    if (g.kind === 'bloom' && !g.open && (g.x - x) * (g.x - x) + (g.y - g.h / 2 - y) * (g.y - g.h / 2 - y) < 160 * 160) {
+    if (g.kind === 'bloom' && !g.open && Math.abs(g.x - x) < 170 && y < g.y + 20 && y > g.y - g.h - 20) {
       g.open = true;
       g.prog = 1;
       w.emit('gateOpen', g.x, g.y - g.h / 2, 0);

@@ -87,7 +87,7 @@ export interface DifficultyTuning {
 export const DIFF: Record<Difficulty, DifficultyTuning> = {
   gentle: { hpBonus: 2, enemyHp: 0.8, enemySpeed: 0.86, telegraph: 1.3, tideRate: 0.75, healAmount: 2, mercy: 1.3 },
   standard: { hpBonus: 0, enemyHp: 1, enemySpeed: 1, telegraph: 1, tideRate: 1, healAmount: 1, mercy: 1 },
-  intense: { hpBonus: -1, enemyHp: 1.2, enemySpeed: 1.12, telegraph: 0.85, tideRate: 1.25, healAmount: 1, mercy: 0.85 },
+  intense: { hpBonus: 0, enemyHp: 1.15, enemySpeed: 1.08, telegraph: 0.88, tideRate: 1.25, healAmount: 1, mercy: 0.85 },
 };
 
 export const BASE_HP = 5;

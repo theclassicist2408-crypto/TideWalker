@@ -83,7 +83,7 @@ function mini(id: string, name: string, area: number, look: number, tint: number
     mini: true,
     look,
     tint,
-    hp: 330 + area * 48,
+    hp: Math.round((240 + area * 34) * (move === 'fly' ? 0.8 : 1)),
     r: 20,
     move,
     phases: [
@@ -95,52 +95,52 @@ function mini(id: string, name: string, area: number, look: number, tint: number
 
 /** The ten area bosses. Each adds attacks and tightens its rhythm as it weakens. */
 export const BOSSES: BossDef[] = [
-  boss('warden', 'The Drowned Warden', 'Keeper of the Shallows', 1, 0, 0x7fa8c8, 1280, 28, 'ground', 'tidebreaker', [
+  boss('warden', 'The Drowned Warden', 'Keeper of the Shallows', 1, 0, 0x7fa8c8, 900, 28, 'ground', 'tidebreaker', [
     { at: 1, gap: 1.7, attacks: [A('charge'), A('slam'), A('fan', 3)] },
     { at: 0.5, gap: 1.2, attacks: [A('slam'), A('rain', 3), A('charge'), A('fan', 5)] },
   ]),
-  boss('mooneater', 'The Moon-Eater', 'Thief of the Pools', 2, 1, 0xc8d8ff, 1440, 26, 'fly', 'veil', [
+  boss('mooneater', 'The Moon-Eater', 'Thief of the Pools', 2, 1, 0xc8d8ff, 800, 26, 'fly', 'veil', [
     { at: 1, gap: 1.6, attacks: [A('dive'), A('fan', 5), A('sweep')] },
     { at: 0.5, gap: 1.15, attacks: [A('dive'), A('spiral'), A('blink'), A('sweep')] },
   ]),
-  boss('sovereign', 'The Kelp Sovereign', 'Root of the Abyss', 3, 2, 0x6fd0a0, 1600, 30, 'ground', 'vinehook', [
+  boss('sovereign', 'The Kelp Sovereign', 'Root of the Abyss', 3, 2, 0x6fd0a0, 1120, 30, 'ground', 'vinehook', [
     { at: 1, gap: 1.6, attacks: [A('rain', 3), A('spikes'), A('summon', 2, 'skitter')] },
     { at: 0.55, gap: 1.2, attacks: [A('beam', 2), A('pull'), A('spikes'), A('rain', 4)] },
   ]),
-  boss('choir', 'The Abyss Choir', 'Voice of the Ruins', 4, 3, 0xc0a8ff, 1760, 26, 'fly', 'echo', [
+  boss('choir', 'The Abyss Choir', 'Voice of the Ruins', 4, 3, 0xc0a8ff, 990, 26, 'fly', 'echo', [
     { at: 1, gap: 1.5, attacks: [A('beam', 2), A('fan', 5), A('summon', 2, 'gloomwing')] },
     { at: 0.6, gap: 1.2, attacks: [A('spiral'), A('beam', 3), A('dive')] },
     { at: 0.25, gap: 0.95, attacks: [A('blink'), A('beam', 3), A('spiral'), A('fan', 7)] },
   ]),
-  boss('squall', 'Squallmother', 'Guardian of Storm Reach', 5, 4, 0xa0c0f0, 1920, 27, 'fly', 'stormstep', [
+  boss('squall', 'Squallmother', 'Guardian of Storm Reach', 5, 4, 0xa0c0f0, 1080, 27, 'fly', 'stormstep', [
     { at: 1, gap: 1.45, attacks: [A('dive'), A('rain', 4), A('sweep')] },
     { at: 0.6, gap: 1.1, attacks: [A('blink'), A('rain', 5), A('spiral'), A('dive')] },
     { at: 0.25, gap: 0.9, attacks: [A('sweep'), A('blink'), A('rain', 6), A('dive')] },
   ]),
-  boss('pontiff', 'The Reef Pontiff', 'Guardian of the Coral Cathedral', 6, 5, 0xff9fb0, 2080, 30, 'ground', 'shield', [
+  boss('pontiff', 'The Reef Pontiff', 'Guardian of the Coral Cathedral', 6, 5, 0xff9fb0, 1460, 30, 'ground', 'shield', [
     { at: 1, gap: 1.4, attacks: [A('spikes'), A('charge'), A('fan', 5)] },
     { at: 0.6, gap: 1.1, attacks: [A('summon', 2, 'thornbloom'), A('beam', 2), A('charge'), A('spikes')] },
     { at: 0.25, gap: 0.9, attacks: [A('shrink'), A('beam', 3), A('slam'), A('fan', 7)] },
   ]),
-  boss('smith', 'The Cinder Smith', 'Guardian of the Sunken Forge', 7, 6, 0xffa060, 2240, 30, 'ground', 'ember', [
+  boss('smith', 'The Cinder Smith', 'Guardian of the Sunken Forge', 7, 6, 0xffa060, 1570, 30, 'ground', 'ember', [
     { at: 1, gap: 1.35, attacks: [A('slam'), A('charge'), A('rain', 4)] },
     { at: 0.6, gap: 1.05, attacks: [A('spikes'), A('slam'), A('fan', 5), A('rain', 5)] },
     { at: 0.25, gap: 0.85, attacks: [A('charge'), A('slam'), A('spikes'), A('rain', 6)] },
   ]),
-  boss('rootmother', 'The Rootmother', 'Guardian of the Abyssal Gardens', 8, 7, 0xd890e0, 2400, 30, 'ground', 'bloom', [
+  boss('rootmother', 'The Rootmother', 'Guardian of the Abyssal Gardens', 8, 7, 0xd890e0, 1680, 30, 'ground', 'bloom', [
     { at: 1, gap: 1.3, attacks: [A('summon', 3, 'mite'), A('pull'), A('spikes')] },
     { at: 0.6, gap: 1.05, attacks: [A('rain', 5), A('spiral'), A('pull'), A('summon', 2, 'thornbloom')] },
     { at: 0.25, gap: 0.85, attacks: [A('beam', 3), A('spikes'), A('spiral'), A('pull')] },
   ]),
-  boss('hush', 'The Hush', 'Guardian of the Silent Deep', 9, 8, 0x8080c0, 2560, 26, 'fly', 'void', [
+  boss('hush', 'The Hush', 'Guardian of the Silent Deep', 9, 8, 0x8080c0, 1440, 26, 'fly', 'void', [
     { at: 1, gap: 1.25, attacks: [A('blink'), A('dive'), A('fan', 5)] },
     { at: 0.6, gap: 1.0, attacks: [A('spiral'), A('pull'), A('beam', 2), A('blink')] },
     { at: 0.25, gap: 0.8, attacks: [A('dive'), A('blink'), A('beam', 3), A('spiral')] },
   ]),
-  boss('tideking', 'The Tide King', 'He Who Drowned the Moon', 10, 9, 0xffd98a, 3200, 32, 'ground', 'crown', [
+  boss('tideking', 'The Tide King', 'He Who Drowned the Moon', 10, 9, 0xffd98a, 1800, 32, 'ground', 'crown', [
     { at: 1, gap: 1.25, attacks: [A('charge'), A('slam'), A('fan', 5), A('rain', 4)] },
     { at: 0.66, gap: 1.0, attacks: [A('beam', 3), A('spikes'), A('blink'), A('slam')] },
-    { at: 0.33, gap: 0.8, attacks: [A('shrink'), A('spiral'), A('pull'), A('charge'), A('summon', 2, 'sentinel'), A('rain', 6)] },
+    { at: 0.33, gap: 0.9, attacks: [A('shrink'), A('spiral'), A('charge'), A('rain', 5), A('slam'), A('beam', 2)] },
   ]),
 ];
 
@@ -317,7 +317,8 @@ export function updateBoss(w: World, dt: number): void {
       b.vx = approach(b.vx, 0, 700 * dt);
     }
     const ty = fly && b.mode === 'idle' ? restY + Math.sin(w.clock * 2.2) * 12 : fly && b.mode === 'recover' ? floor - b.def.r - 6 : restY;
-    b.vy = (ty - b.y) * (b.mode === 'recover' ? 3 : 4);
+    // A flyer drops to the ground to recover: that is the opening against it.
+    b.vy = (ty - b.y) * (b.mode === 'recover' ? 11 : 4);
     if (b.t <= 0) {
       if (b.mode === 'recover') {
         b.mode = 'idle';
@@ -346,7 +347,7 @@ export function updateBoss(w: World, dt: number): void {
 
 function toRecover(b: BossState, time: number): void {
   b.mode = 'recover';
-  b.t = time;
+  b.t = time + (b.def.move === 'fly' ? 0.7 : 0);
   b.spec = null;
   b.vx = 0;
 }

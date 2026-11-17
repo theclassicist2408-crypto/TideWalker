@@ -22,7 +22,7 @@ export const ENEMY: Record<EnemyKind, Stat> = {
   spitter: { hp: 28, speed: 0, r: 12, aggro: 330, move: 'still', windup: 0.5, rest: 1.7 },
   gloomwing: { hp: 22, speed: 80, r: 11, aggro: 210, move: 'fly', windup: 0.48, rest: 1.0 },
   needlefish: { hp: 22, speed: 60, r: 11, aggro: 230, move: 'swim', windup: 0.45, rest: 1.0 },
-  burrower: { hp: 34, speed: 120, r: 13, aggro: 260, move: 'ground', windup: 0.65, rest: 1.4 },
+  burrower: { hp: 34, speed: 120, r: 13, aggro: 260, move: 'ground', windup: 0.65, rest: 1.8 },
   lurker: { hp: 34, speed: 0, r: 13, aggro: 76, move: 'still', windup: 0.42, rest: 1.3 },
   shellback: { hp: 44, speed: 44, r: 14, aggro: 240, move: 'ground', windup: 0.5, rest: 1.1 },
   broodmother: { hp: 80, speed: 0, r: 18, aggro: 380, move: 'still', windup: 0.6, rest: 3.6 },
@@ -38,7 +38,7 @@ export const ENEMY_KINDS = Object.keys(ENEMY) as EnemyKind[];
 
 export function spawnEnemy(w: World, kind: EnemyKind, x: number, y: number, x0: number, x1: number, elite: boolean, arena: number, wave: number): EnemyState {
   const s = ENEMY[kind];
-  const hp = Math.round(s.hp * (1 + 0.11 * (w.tier - 1)) * w.diff.enemyHp * (elite ? 1.8 : 1));
+  const hp = Math.round(s.hp * (1 + 0.08 * (w.tier - 1)) * w.diff.enemyHp * (elite ? 1.5 : 1));
   const e: EnemyState = {
     kind,
     x,
@@ -567,6 +567,6 @@ export function updateEnemies(w: World, dt: number): void {
 
     // Touching a foe hurts, except while it is dazed, buried or resting open.
     const harmless = e.mode === 'stun' || e.mode === 'hidden' || (e.kind === 'burrower' && e.mode === 'windup') || (e.kind === 'voidling' && e.mode !== 'rest');
-    if (!harmless && dist < s.r + P.halfW - 1) hurtPlayer(w, e.elite && w.tier >= 7 ? 2 : 1, e.x, e.y);
+    if (!harmless && dist < s.r + P.halfW - 1) hurtPlayer(w, 1, e.x, e.y);
   }
 }

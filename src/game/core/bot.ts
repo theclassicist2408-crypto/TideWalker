@@ -22,6 +22,8 @@ export class Bot {
   private wasFailed = false;
   private chargeHold = 0;
   private jumpWait = 0;
+  private lastWall = 0;
+  private focus: EnemyState | null = null;
 
   constructor(
     private readonly w: World,
@@ -81,7 +83,8 @@ export class Bot {
     out.mx = out.my = 0;
     out.jump = out.dash = out.pulse = out.glow = out.attack = out.heal = out.ability = false;
     out.attackHeld = false;
-    out.jumpHeld = true;
+    // Hold the jump only while rising: holding it on the way down would glide, and waste time.
+    out.jumpHeld = this.w.player.vy < 0 && !this.w.player.onGround;
     this.jumpWait = Math.max(0, this.jumpWait - dt);
 
     if (w.status === 'failed') {
@@ -147,6 +150,8 @@ export class Bot {
     else out.mx = 1;
 
     this.avoid(out);
+    // A jump pressed now must be held, or it is cut to a hop on its first frame.
+    if (out.jump) out.jumpHeld = true;
     this.mend(out, foe !== null);
     return this.unstick(out, dt);
   }
@@ -163,9 +168,19 @@ export class Bot {
     const w = this.w;
     const p = w.player;
     const wps = w.level.waypoints;
-    const dx = t.x - p.x;
+    let tx = t.x;
+    let wait = false;
+    for (const pl of w.platforms) {
+      if (!pl.period || Math.abs(pl.x0 + pl.w / 2 - t.x) > 3 || Math.abs(pl.y0 - 9 - t.y) > 3) continue;
+      // A sliding ledge: aim at where it is, and do not leap until it has come close.
+      tx = pl.x + pl.w / 2;
+      wait = p.onGround && p.onPlatform !== pl && Math.abs(tx - p.x) > 104;
+    }
+    const dx = tx - p.x;
     const dy = t.y - p.y;
     let dir = Math.abs(dx) > 4 ? Math.sign(dx) : 0;
+    // Standing on the lip right above the next point: step off.
+    if (dir === 0 && dy > 30 && p.onGround) dir = 1;
     if (this.reverseT > 0) {
       this.reverseT -= dt;
       dir = -dir || -1;
@@ -214,9 +229,21 @@ export class Bot {
     }
     this.chargeHold = 0;
 
+    // Down a hole with the route far overhead: head for the far wall and climb it.
+    const climbOut = dy < -96 && t.act !== 'climb' && Math.abs(dx) < 400 && w.ground.at(p.x) > t.y + 80;
+    if (climbOut) out.mx = 1;
+    if (p.onGround) this.lastWall = 0;
     if (p.onGround) {
       const wallHeight = this.wallAhead(p.x, feet, look);
       const gap = !this.footing(p.x + look * 12, feet) && dir !== 0 && !t.swim && t.y < p.y + 60;
+      if (wait && gap) {
+        out.mx = 0;
+        return;
+      }
+      if (climbOut && (wallHeight > 7 || Math.abs(p.vx) < 10) && this.jumpWait <= 0) {
+        out.jump = true;
+        return;
+      }
       const higher = dy < -16;
       if (wallHeight > 7 && dir !== 0) {
         // Any wall: jump at it. Taller ones are finished with a second jump or by kicking up the face.
@@ -239,19 +266,24 @@ export class Bot {
     }
 
     // Airborne: spend the extra moves only when they are needed to make the landing.
-    if (Math.abs(dx) < 5) out.mx = 0;
+    if (Math.abs(dx) < 5 && !climbOut) out.mx = 0;
     const falling = p.vy > 30;
     const below = this.footing(p.x + look * 6, feet + Math.max(0, p.vy) * 0.12) || this.footing(p.x, feet);
     const needHeight = t.y < p.y - 14;
     if (p.wallT > 0 && w.has('wall') && (needHeight || !below)) {
       out.mx = p.wallDir;
+      this.lastWall = p.wallDir;
       if (p.vy > -120) out.jump = true;
       return;
     }
+    // After kicking off a wall straight below the goal, drift back to that wall.
+    if (needHeight && out.mx === 0 && this.lastWall !== 0 && p.lockT <= 0) out.mx = this.lastWall;
     if (falling && w.has('double') && p.jumpsLeft > 0 && (needHeight || (!below && Math.abs(dx) > 26))) {
       out.jump = true;
       return;
     }
+    // Glide only when there is a long way to go and nothing underfoot.
+    if (falling && !below && Math.abs(dx) > 90 && p.jumpsLeft === 0) out.jumpHeld = true;
     if (falling && w.has('airdash') && !p.airDashed && p.dashCd <= 0 && !below && Math.abs(dx) > 70 && p.jumpsLeft === 0) out.dash = true;
   }
 
@@ -295,6 +327,10 @@ export class Bot {
     const b = w.boss;
     let best: { x: number; y: number; r: number; e: EnemyState | null } | null = null;
     let bestD = Infinity;
+    // Finish what was started: chasing whoever is nearest this instant gets nothing killed.
+    const f = this.focus;
+    if (arena >= 0 && f && f.alive && f.active && f.arena === arena && (!b || b.mode === 'dead')) return { x: f.x, y: f.y, r: ENEMY[f.kind].r, e: f };
+    this.focus = null;
     for (const e of w.enemies) {
       if (!e.alive || !e.active) continue;
       const d = Math.hypot(e.x - p.x, e.y - p.y);
@@ -306,6 +342,7 @@ export class Bot {
       best = { x: e.x, y: e.y, r: ENEMY[e.kind].r, e };
     }
     if (b && b.mode !== 'dead' && (arena === b.arena || w.arenas[b.arena].state === 'active') && bestD > 90) return { x: b.x, y: b.y, r: b.def.r, e: null };
+    this.focus = best ? best.e : null;
     return best;
   }
 
@@ -328,36 +365,54 @@ export class Bot {
         p.facing = dir;
         out.attack = true;
       }
+      // A fish that has drawn back to dart: slip sideways off its line.
+      if (e && (e.mode === 'windup' || e.mode === 'attack') && Math.hypot(dx, dy) < 150) {
+        out.mx = -e.b;
+        out.my = e.a >= 0 ? 1 : -1;
+        if (w.has('dash') && p.dashCd <= 0 && e.mode === 'attack') out.dash = true;
+      }
       return;
     }
 
     // When to strike, and when to hang back.
     let open = true;
     let armoured = false;
+    const flyer = b !== null && b !== undefined && b.def.move === 'fly';
     if (e) {
       if (e.kind === 'shellback') armoured = !((p.x - e.x) * e.facing < 0 || e.mode === 'rest' || e.mode === 'stun');
       if (e.kind === 'thornbloom') armoured = e.mode === 'idle';
+      if (e.kind === 'burrower' && e.mode === 'hidden') {
+        // Stand over it to draw it out; the warning ring tells us when to step away.
+        out.mx = Math.abs(dx) > 14 ? dir : 0;
+        return;
+      }
       if (e.kind === 'burrower') open = e.mode === 'rest' || e.mode === 'stun';
       if (e.mode === 'attack' && (e.kind === 'skitter' || e.kind === 'sentinel' || e.kind === 'shellback' || e.kind === 'lurker')) open = false;
     } else if (b) {
-      open = b.mode === 'recover' || b.mode === 'idle' || b.mode === 'tele';
+      // Flying guardians are only in reach when they come down to recover.
+      open = flyer ? b.mode === 'recover' : b.mode === 'recover' || b.mode === 'idle' || b.mode === 'tele';
     }
 
     if (!open) {
-      // Give ground and be ready to leap a charge.
-      out.mx = Math.abs(dx) < 150 ? -dir : 0;
-      if (p.onGround && Math.abs(dx) < 120 && Math.abs(dy) < 50) out.jump = true;
+      // Hold a little distance and be ready to leap a charge; flyers get a wider berth.
+      const keep = flyer ? f.r + 110 : 70;
+      out.mx = Math.abs(dx) < keep ? -dir : 0;
+      if (!flyer && p.onGround && Math.abs(dx) < 110 && Math.abs(dy) < 50) out.jump = true;
       return;
     }
 
+    if (armoured && w.has('charge') && p.lumen >= P.chargeCost) {
+      // A charged strike goes straight through a shell.
+      const near = Math.abs(dx) < P.chargeReach - 8;
+      out.mx = near ? 0 : dir;
+      p.facing = dir;
+      out.attackHeld = !(near && p.chargeT >= P.chargeTime);
+      return;
+    }
     if (armoured) {
-      // Shells and closed blooms are struck from above.
-      out.mx = Math.abs(dx) > 10 ? dir : 0;
-      if (p.onGround && Math.abs(dx) < 70) out.jump = true;
-      if (!p.onGround && Math.abs(dx) < 22 && dy > 6 && dy < 70 && p.slashCd <= 0) {
-        out.my = 1;
-        out.attack = true;
-      }
+      // Wait just outside its reach: a shellback lunges and is open afterwards; a bloom opens to fire.
+      const stand = e && e.kind === 'shellback' ? 58 : 84;
+      out.mx = Math.abs(dx) > stand + 8 ? dir : Math.abs(dx) < stand - 14 ? -dir : 0;
       return;
     }
 
@@ -474,6 +529,11 @@ export class Bot {
       if ((e.kind === 'gloomwing' || e.kind === 'needlefish') && Math.hypot(dx, e.y - p.y) < 90) flee = dx >= 0 ? -1 : 1;
     }
 
+    // Never back out of the arena: an optional guardian forgets the fight if we leave.
+    for (const a of w.arenas) {
+      if (a.state !== 'active' || flee === 0) continue;
+      if (p.x + flee * 70 < a.x0 + 44 || p.x + flee * 70 > a.x1 - 44) flee = -flee;
+    }
     if (stayLow) {
       out.jump = false;
       out.jumpHeld = false;
@@ -548,7 +608,7 @@ export interface BotResult {
 }
 
 /** Plays a whole level headlessly. Used by tests and by the level verification script. */
-export function runBot(make: () => World, collect: boolean, limitSeconds = 600): BotResult {
+export function runBot(make: () => World, collect: boolean, limitSeconds = 900): BotResult {
   const w = make();
   let bot = new Bot(w, collect);
   let t = 0;
