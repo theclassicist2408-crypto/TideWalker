@@ -3,6 +3,7 @@
  * so the whole world renders from a single texture (one batch, no downloads, no placeholder art).
  * Sprites are painted in white/neutral tones where the renderer tints them.
  */
+import { CREATURE_PAINTERS } from './creatures';
 
 export interface Frame {
   x: number;
@@ -1499,6 +1500,7 @@ Object.assign(painters, {
     },
   },
   ...SWORD_PAINTERS,
+  ...CREATURE_PAINTERS,
   /**
    * Arena ward: a curtain of red-violet light that seals a fight. Downward chevrons give it a
    * shape of its own, so it reads as a barrier without relying on its colour.

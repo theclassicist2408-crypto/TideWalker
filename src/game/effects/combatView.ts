@@ -3,6 +3,7 @@ import { LIGHT, type Palette } from '../../assets/data/palettes';
 import { clamp, lerp } from '../core/util';
 import type { World } from '../core/world';
 import { ENEMY } from '../entities/enemies';
+import { FoeRig } from './foeRig';
 import { mixColor, type Gfx } from './gfx';
 import type { Lightmap } from './lightmap';
 
@@ -15,7 +16,7 @@ export class CombatLayer {
   readonly glow = new Container();
   readonly zones = new Graphics();
   private readonly solids = new Graphics();
-  private readonly foes: { body: Sprite; eye: Sprite }[] = [];
+  private readonly foes: { rig: FoeRig; eye: Sprite }[] = [];
   private readonly shots: Sprite[] = [];
   private readonly shrines: { stone: Sprite; light: Sprite }[] = [];
   private readonly chests: { box: Sprite; light: Sprite }[] = [];
@@ -184,19 +185,19 @@ export class CombatLayer {
 
     // Foes: one sprite pair each, created on demand (guardians summon more).
     while (this.foes.length < w.enemies.length) {
-      const body = gfx.sprite('e_skitter');
+      const rig = new FoeRig(gfx);
       const eye = gfx.sprite('dot');
       eye.blendMode = 'add';
       eye.tint = LIGHT.dangerEye;
-      this.mid.addChild(body);
+      this.mid.addChild(rig.root);
       this.glow.addChild(eye);
-      this.foes.push({ body, eye });
+      this.foes.push({ rig, eye });
     }
     for (let i = 0; i < this.foes.length; i++) {
       const v = this.foes[i];
       const e = w.enemies[i];
       const on = e !== undefined && e.alive && e.active && e.x > left - 60 && e.x < right + 60;
-      v.body.visible = on;
+      v.rig.root.visible = on;
       v.eye.visible = on;
       if (e && e.alive && e.active) {
         const d = Math.hypot(e.x - p.x, e.y - p.y);
@@ -211,24 +212,22 @@ export class CombatLayer {
       const x = lerp(e.prevX, e.x, alpha);
       const y = lerp(e.prevY, e.y, alpha);
       const wind = e.mode === 'windup';
-      const shake = wind ? Math.sin(t * 70 + i) * 1.6 : 0;
-      v.body.texture = gfx.tex(`e_${e.kind}`);
-      v.body.position.set(x + shake, y + (e.kind === 'gloomwing' || e.kind === 'stormjelly' ? Math.sin(t * 6 + i) * 2 : 0));
-      const size = (s.r / 13) * (e.elite ? 1.3 : 1) * (wind ? 1.08 : 1);
+      const size = (s.r / 13) * (e.elite ? 1.3 : 1) * (wind ? 1.06 : 1);
       // A struck foe squashes away from the blow for a moment.
       const hitK = clamp(e.flash / 0.12, 0, 1);
-      v.body.scale.set(inv * size * (e.facing >= 0 ? 1 : -1) * (1 + 0.35 * hitK), inv * size * (e.mode === 'stun' ? 0.85 : 1) * (1 - 0.25 * hitK));
+      v.rig.update(e, x, y, t, i * 0.7, size, hitK);
       // Hidden things are almost invisible: a mound for the burrower, a shimmer for the voidling.
       const lit = clamp(1.3 - d2(e.x - p.x, e.y - p.y) / (w.lightRadius * 1.2), 0, 1);
       let a = Math.min(1, e.spawnT * 2);
       if (e.mode === 'hidden') a *= 0.28;
       if (e.kind === 'voidling' && e.mode === 'idle') a *= 0.1 + 0.6 * lit;
       if (w.level.rules.fog) a *= 0.25 + 0.75 * clamp(1.4 - d2(e.x - p.x, e.y - p.y) / 150, 0, 1);
-      v.body.alpha = a;
-      v.body.tint = e.flash > 0 ? 0xffffff : e.burn > 0 ? 0xffb070 : e.elite ? 0xffc8e8 : e.mode === 'stun' ? 0x9fb8ff : 0xe8e0ff;
-      v.eye.position.set(x + e.facing * s.r * 0.4, y - s.r * 0.2);
-      v.eye.scale.set((wind ? 26 + Math.sin(t * 40) * 6 : 10) / 32);
-      v.eye.alpha = a * (wind ? 1 : e.mode === 'attack' ? 0.9 : 0.35);
+      v.rig.root.alpha = a;
+      v.rig.shade(e.flash > 0, e.burn > 0, e.mode === 'stun', e.elite);
+      // A red-violet glow swells around a foe winding up: the tell, in light as well as pose.
+      v.eye.position.set(x, y - s.r * 0.2);
+      v.eye.scale.set((wind ? 70 + Math.sin(t * 40) * 10 : 20) / 32);
+      v.eye.alpha = a * (wind ? 0.55 : e.mode === 'attack' ? 0.4 : 0.08);
       if (wind) lights.add(x, y, 50, LIGHT.danger, 0.45);
     }
 
