@@ -24,7 +24,7 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
   }
 
   const calm = w.mode === 'drift' || w.mode === 'title';
-  const waterY = w.waterY;
+  const waterY = w.waterAt(p.x);
   const crown = p.crownT > 0;
 
   p.invuln = Math.max(0, p.invuln - dt);
@@ -290,7 +290,8 @@ function swimStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
     iy /= len;
   }
   const speed = P.swimSpeed * (p.crownT > 0 ? 1.15 : 1);
-  const atSurface = p.y <= w.waterY + 3;
+  const waterY = w.waterAt(p.x);
+  const atSurface = p.y <= waterY + 3;
   let tvx = ix * speed;
   let tvy = iy * speed;
   if (Math.abs(iy) < 0.1) tvy = atSurface ? 0 : -P.buoyancy * (w.has('dive') ? 1 : 4);
@@ -304,7 +305,7 @@ function swimStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
   p.vy += (tvy - p.vy) * k;
 
   if (inp.jump) p.leapArm = P.leapArm;
-  if (p.y <= w.waterY + 1.5 && p.vy <= 0) {
+  if (p.y <= waterY + 1.5 && p.vy <= 0) {
     if (p.leapArm > 0 && !rooted) {
       p.vy = -P.leapVel;
       p.vx += ix * 40;
@@ -313,10 +314,10 @@ function swimStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
       p.jumping = false;
       p.jumpsLeft = 1;
       p.airDashed = false;
-      w.emit('splashOut', p.x, w.waterY, P.leapVel);
+      w.emit('splashOut', p.x, waterY, P.leapVel);
     } else {
       p.vy = 0;
-      p.y = w.waterY + 1.5;
+      p.y = waterY + 1.5;
     }
   }
 }
@@ -324,7 +325,7 @@ function swimStep(w: World, inp: Intent, dt: number, rooted: boolean): void {
 function applyCurrents(w: World, dt: number): void {
   const p = w.player;
   p.inSafe = false;
-  if (p.y + P.halfH < w.waterY) return;
+  if (p.y + P.halfH < w.waterAt(p.x)) return;
   for (let i = 0; i < w.currents.length; i++) {
     const c = w.currents[i];
     if (c.power === 0) continue;

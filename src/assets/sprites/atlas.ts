@@ -1168,6 +1168,34 @@ Object.assign(painters, {
       c.fill();
     },
   },
+  /**
+   * Arena ward: a curtain of red-violet light that seals a fight. Downward chevrons give it a
+   * shape of its own, so it reads as a barrier without relying on its colour.
+   */
+  ward: {
+    w: 26,
+    h: 128,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.fillStyle = linear(c, 0, 0, w, 0, [
+        [0, 'rgba(176,74,154,0)'],
+        [0.5, 'rgba(208,112,200,0.55)'],
+        [1, 'rgba(176,74,154,0)'],
+      ]);
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = 'rgba(255,214,246,0.9)';
+      c.fillRect(w / 2 - 1, 0, 2, h);
+      c.strokeStyle = 'rgba(240,170,230,0.85)';
+      c.lineWidth = 1.6;
+      c.lineJoin = 'round';
+      for (let y = 8; y < h - 4; y += 14) {
+        c.beginPath();
+        c.moveTo(w / 2 - 7, y);
+        c.lineTo(w / 2, y + 6);
+        c.lineTo(w / 2 + 7, y);
+        c.stroke();
+      }
+    },
+  },
   /** A shrine: a standing ring that holds a lost power. */
   shrine: {
     w: 36,

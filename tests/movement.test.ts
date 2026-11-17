@@ -179,14 +179,15 @@ describe('movement', () => {
     shallow.player.y = 70;
     run(shallow, 2, { my: 1 });
     expect(shallow.player.swim).toBe(true);
-    expect(shallow.player.y).toBeLessThan(shallow.waterY + 8);
+    expect(shallow.player.y).toBeLessThan(shallow.waterAt(900) + 8);
 
     const deep = makeWorld(level, { load: loadout(['dive']) });
     deep.player.x = 900;
     deep.player.y = 70;
     run(deep, 1, { my: 1 });
-    expect(deep.player.y).toBeGreaterThan(deep.waterY + 80);
-    const events = run(deep, 1.5, { my: -1, jump: true });
+    expect(deep.player.y).toBeGreaterThan(deep.waterAt(900) + 80);
+    const events: string[] = [];
+    for (let i = 0; i < 15; i++) events.push(...run(deep, 0.1, { my: -1, jump: true }));
     expect(events).toContain('splashOut');
   });
 
@@ -223,5 +224,35 @@ describe('movement', () => {
       top = Math.min(top, w.player.y);
     }
     expect(top).toBeGreaterThanOrEqual(-100 + P.halfH - 0.01);
+  });
+
+  it('a basin holds its own still water, a little below its rim, whatever the sea does', () => {
+    const level = flatLevel((b) => b.basin(400, 200, 0.2), 900);
+    const lake = level.lakes[0];
+    expect(lake.y).toBe(P.lakeDrop);
+    const w = makeWorld(level);
+    expect(w.waterAt(lake.x0 + 50)).toBe(lake.y);
+    expect(w.waterAt(lake.x0 - 50)).toBe(w.waterY);
+    w.player.x = (lake.x0 + lake.x1) / 2;
+    w.player.y = 0;
+    run(w, 0.8);
+    expect(w.player.swim).toBe(true);
+    expect(w.player.y).toBeCloseTo(lake.y + 1.5, 0);
+  });
+
+  it('a sunken wall in a sump can only be passed by diving', () => {
+    const cross = (abilities: Parameters<typeof loadout>[0]): number => {
+      const level = flatLevel((b) => b.basin(460, 200, 0.16, (bb) => bb.block(250, 30, 40, 110)), 900);
+      const w = makeWorld(level, { load: loadout(abilities) });
+      w.player.x = 690;
+      w.player.y = 30;
+      for (let i = 0; i < 60 * 4; i++) {
+        const before = w.player.x < 820;
+        run(w, 1 / 60, { mx: 1, my: before && w.player.x > 740 ? 1 : w.player.x > 860 ? -1 : 0 });
+      }
+      return w.player.x;
+    };
+    expect(cross(['dive'])).toBeGreaterThan(880);
+    expect(cross([])).toBeLessThan(810);
   });
 });

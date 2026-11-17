@@ -16,6 +16,8 @@ export const P = {
   airAccel: 2100,
   /** Fraction of a level's wind (px/s) added to the air-control target. */
   windPush: 0.3,
+  /** How far below a basin's rim its still water sits. */
+  lakeDrop: 14,
   gravity: 1750,
   jumpVel: 570,
   jumpCut: 0.45,

@@ -101,6 +101,14 @@ export interface KelpDef {
   h: number;
 }
 
+/** Still water held in a basin or pit, independent of the sea. */
+export interface LakeDef {
+  x0: number;
+  x1: number;
+  /** Surface height. */
+  y: number;
+}
+
 export interface PoolDef {
   x: number;
   y: number;
@@ -294,6 +302,7 @@ export interface LevelData {
   kin: KinDef[];
   waypoints: Waypoint[];
   tide: TideDef;
+  lakes: LakeDef[];
   weather: WeatherDef;
   spawn: PointDef;
   goalX: number;

@@ -466,7 +466,7 @@ export class Game implements UiHost {
     const done =
       (kind === 'move' && Math.abs(p.vx) > 120) ||
       (kind === 'swim' && p.swim && this.hintT > 1) ||
-      (kind === 'dive' && p.swim && p.y > w.waterY + 40) ||
+      (kind === 'dive' && p.swim && p.y > w.waterAt(p.x) + 40) ||
       (kind === 'glide' && p.gliding && this.hintT > 0.4) ||
       (kind === 'glow' && p.glow > 0.95) ||
       (timed && this.hintT > 4.5);
@@ -619,7 +619,7 @@ export class Game implements UiHost {
     a.tide = w.tide.progress;
     a.lumen = w.lumenFrac;
     a.glow = this.state === 'playing' ? p.glow : 0;
-    a.submerged = p.swim && p.y > w.waterY + 14;
+    a.submerged = p.swim && p.y > w.waterAt(p.x) + 14;
     a.rain = w.level.weather.rain;
     a.wind = w.level.weather.wind;
     a.paused = frozen;

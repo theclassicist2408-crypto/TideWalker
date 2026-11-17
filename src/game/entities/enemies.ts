@@ -296,7 +296,7 @@ export function updateEnemies(w: World, dt: number): void {
           break;
         }
         case 'needlefish': {
-          const wet = w.waterY + 14 < w.ground.at(e.x) - 14;
+          const wet = w.waterAt(e.x) + 14 < w.ground.at(e.x) - 14;
           if (!wet) {
             e.vx = e.vy = 0;
             break;
@@ -306,7 +306,7 @@ export function updateEnemies(w: World, dt: number): void {
             else if (e.x >= e.x1 - 4) e.facing = -1;
             e.vx = approach(e.vx, e.facing * s.speed * pace, 200 * dt);
             e.vy = approach(e.vy, (e.homeY - e.y) * 2, 200 * dt);
-            if (sees && e.t <= 0 && p.y > w.waterY - 30) {
+            if (sees && e.t <= 0 && p.y > w.waterAt(p.x) - 30) {
               e.a = dx / (dist || 1);
               e.b = dy / (dist || 1);
               e.facing = dx >= 0 ? 1 : -1;
@@ -557,7 +557,10 @@ export function updateEnemies(w: World, dt: number): void {
       e.y += e.vy * dt;
       const floor = w.ground.at(e.x) - s.r;
       if (e.y > floor) e.y = floor;
-      if (s.move === 'swim' && e.y < w.waterY + 10) e.y = w.waterY + 10;
+      if (s.move === 'swim') {
+        const surface = w.waterAt(e.x) + 10;
+        if (e.y < surface) e.y = surface;
+      }
     }
     if (e.x < e.x0) {
       e.x = e.x0;

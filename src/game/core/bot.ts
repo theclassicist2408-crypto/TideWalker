@@ -204,15 +204,16 @@ export class Bot {
     }
 
     if (p.swim) {
-      const above = t.y < w.waterY - 6;
-      if (t.y < w.waterY - 74) {
+      const surface = w.waterAt(p.x);
+      const above = t.y < surface - 6;
+      if (t.y < surface - 74) {
         out.mx = 1;
         out.my = -1;
-        if (p.y <= w.waterY + 5 && Math.abs(p.vx) < 14) out.jump = true;
+        if (p.y <= surface + 5 && Math.abs(p.vx) < 14) out.jump = true;
       } else if (above) {
         out.mx = dir;
         out.my = -1;
-        if (p.y <= w.waterY + 5 && (Math.abs(dx) < 90 || Math.abs(p.vx) < 12)) out.jump = true;
+        if (p.y <= surface + 5 && (Math.abs(dx) < 90 || Math.abs(p.vx) < 12)) out.jump = true;
       } else {
         out.mx = Math.max(-1, Math.min(1, dx / 14));
         out.my = Math.max(-1, Math.min(1, dy / 14));

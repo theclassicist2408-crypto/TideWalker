@@ -477,6 +477,17 @@ export class World {
     };
   }
 
+  /** Water surface at `x`: the sea, or a basin's still water where that stands higher. */
+  waterAt(x: number): number {
+    let y = this.waterY;
+    const lakes = this.level.lakes;
+    for (let i = 0; i < lakes.length; i++) {
+      const l = lakes[i];
+      if (x >= l.x0 && x <= l.x1 && l.y < y) y = l.y;
+    }
+    return y;
+  }
+
   has(ability: AbilityId): boolean {
     return this.load.abilities.has(ability);
   }

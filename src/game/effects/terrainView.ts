@@ -1,5 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import type { Palette } from '../../assets/data/palettes';
+import type { LakeDef } from '../core/types';
 import { hashString, makeRng } from '../core/util';
 import type { World } from '../core/world';
 import { OPEN_SKY, type Heightfield } from '../systems/terrain';
@@ -187,38 +188,64 @@ export class TerrainView {
   }
 }
 
-/** The sea: a translucent body with a moving surface line, redrawn each frame for the visible span. */
+/** The sea and any still water in basins: translucent bodies with moving surfaces, redrawn each frame. */
 export class WaterView {
   readonly g = new Graphics();
+  // Scratch buffers, reused every frame.
   private readonly pts: number[] = [];
+  private readonly poly: number[] = [];
 
   /** Surface height including ripples, so splashes and floating things can sit on it. */
   static surface(x: number, waterY: number, t: number): number {
     return waterY + Math.sin(x * 0.034 + t * 1.5) * 1.8 + Math.sin(x * 0.011 - t * 0.7) * 2.6;
   }
 
-  draw(pal: Palette, left: number, right: number, bottom: number, waterY: number, t: number, calm: number): void {
+  draw(pal: Palette, left: number, right: number, bottom: number, waterY: number, lakes: readonly LakeDef[], ground: { at(x: number): number }, t: number, calm: number): void {
+    const g = this.g;
+    g.clear();
+    if (waterY <= bottom) {
+      const x0 = Math.floor((left - 24) / 16) * 16;
+      this.surfaceLine(x0, right + 24, waterY, t, calm);
+      this.body(pal, bottom + 40, null);
+    }
+    for (let i = 0; i < lakes.length; i++) {
+      const l = lakes[i];
+      if (l.x1 < left - 24 || l.x0 > right + 24 || l.y >= waterY || l.y > bottom) continue;
+      this.surfaceLine(l.x0, l.x1, l.y, t, calm);
+      this.body(pal, 0, ground);
+    }
+  }
+
+  /** Fills `pts` with the rippled surface from x0 to x1 (ends included). */
+  private surfaceLine(x0: number, x1: number, y: number, t: number, calm: number): void {
+    const pts = this.pts;
+    pts.length = 0;
+    const n = Math.max(2, Math.ceil((x1 - x0) / 16) + 1);
+    for (let i = 0; i < n; i++) {
+      const x = x0 + ((x1 - x0) * i) / (n - 1);
+      pts.push(x, y + (WaterView.surface(x, y, t) - y) * calm);
+    }
+  }
+
+  /**
+   * Fills the water under the surface in `pts` in three depth bands. The floor is flat at
+   * `floor`, or follows `ground` for a basin, so the water sits in the bowl that holds it.
+   */
+  private body(pal: Palette, floor: number, ground: { at(x: number): number } | null): void {
     const g = this.g;
     const pts = this.pts;
-    g.clear();
-    if (waterY > bottom) return;
-    pts.length = 0;
-    const x0 = Math.floor((left - 24) / 16) * 16;
-    for (let x = x0; x <= right + 24; x += 16) {
-      pts.push(x, waterY + (WaterView.surface(x, waterY, t) - waterY) * calm);
-    }
     const n = pts.length;
-    const body: number[] = pts.slice();
-    body.push(pts[n - 2], bottom + 40, pts[0], bottom + 40);
-    g.poly(body).fill({ color: pal.water, alpha: 0.4 });
-    const deep: number[] = [];
-    for (let i = 0; i < n; i += 2) deep.push(pts[i], pts[i + 1] + 46);
-    deep.push(pts[n - 2], bottom + 40, pts[0], bottom + 40);
-    g.poly(deep).fill({ color: pal.waterDeep, alpha: 0.34 });
-    const abyss: number[] = [];
-    for (let i = 0; i < n; i += 2) abyss.push(pts[i], pts[i + 1] + 150);
-    abyss.push(pts[n - 2], bottom + 40, pts[0], bottom + 40);
-    g.poly(abyss).fill({ color: pal.waterDeep, alpha: 0.4 });
+    for (let b = 0; b < BANDS.length; b++) {
+      const [offset, color, alpha] = BANDS[b];
+      const poly = this.poly;
+      poly.length = 0;
+      for (let i = 0; i < n; i += 2) {
+        const bed = ground ? ground.at(pts[i]) : floor;
+        poly.push(pts[i], Math.min(pts[i + 1] + offset, bed));
+      }
+      for (let i = n - 2; i >= 0; i -= 2) poly.push(pts[i], ground ? ground.at(pts[i]) + 2 : floor);
+      g.poly(poly).fill({ color: color === 0 ? pal.water : pal.waterDeep, alpha });
+    }
     g.moveTo(pts[0], pts[1]);
     for (let i = 2; i < n; i += 2) g.lineTo(pts[i], pts[i + 1]);
     g.stroke({ width: 1.6, color: pal.surface, alpha: 0.62 });
@@ -227,3 +254,10 @@ export class WaterView {
     g.stroke({ width: 3, color: pal.surface, alpha: 0.12 });
   }
 }
+
+/** Depth bands of a body of water: [offset below the surface, 0 = water / 1 = deep, alpha]. */
+const BANDS: [number, number, number][] = [
+  [0, 0, 0.4],
+  [46, 1, 0.34],
+  [150, 1, 0.4],
+];

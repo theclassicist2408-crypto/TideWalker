@@ -1,4 +1,5 @@
 import type { AbilityId, ArenaDef, BiomeId, CurrentDef, EnemyKind, HintKind, LevelData, LevelRules, PlatformDef, TideDef, UpgradeId, Waypoint, WeatherDef } from '../core/types';
+import { P } from '../core/constants';
 import { OPEN_SKY } from '../systems/terrain';
 
 export interface LevelMeta {
@@ -55,6 +56,7 @@ export class LevelBuilder {
       currents: [],
       kelp: [],
       pools: [],
+      lakes: [],
       plants: [],
       fireflies: [],
       urchins: [],
@@ -141,6 +143,7 @@ export class LevelBuilder {
     this.x += width;
     this.y = farY;
     this.wet.push([x0, this.x]);
+    if (opts.swim) this.data.lakes.push({ x0, x1: this.x, y: Math.max(nearY, farY) + P.lakeDrop });
     if (opts.rungs !== false) {
       for (let h = 46; h < nearY + depth - farY - 30; h += 46) this.data.platforms.push({ x: this.x - 24, y: farY + h, w: 24, kind: 'rock' });
       if (width >= 70) for (let h = 66; h < depth - 30; h += 46) this.data.platforms.push({ x: x0, y: nearY + h, w: 24, kind: 'rock' });
@@ -163,6 +166,9 @@ export class LevelBuilder {
     this.point(x0 + width, this.y);
     this.x += width;
     this.wet.push([x0, this.x]);
+    // The water starts where the banks dip below its surface.
+    const shore = (b * P.lakeDrop) / depth;
+    this.data.lakes.push({ x0: x0 + shore, x1: this.x - shore, y: this.y + P.lakeDrop });
     this.wp(x0 + b, this.y + Math.min(depth, 30) - 9, { swim: true });
     // Anything the swimmer must pass on the way across (a sunken wall to dive under) goes here.
     if (under) under(this);

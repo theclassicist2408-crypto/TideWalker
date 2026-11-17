@@ -390,7 +390,7 @@ export class GameRenderer {
     this.motes.update(step);
     this.sparks.update(step);
     this.bubbles.update(step);
-    this.water.draw(this.pal, left, right, bottom, w.waterY, t, calm);
+    this.water.draw(this.pal, left, right, bottom, w.waterY, w.level.lakes, w.ground, t, calm);
 
     // --- Light ---------------------------------------------------------------------------
     const fading = 1;
@@ -408,7 +408,7 @@ export class GameRenderer {
 
     const roofed = w.ceil.length > 0 && w.ceil.at(cam.x) > OPEN_SKY / 2 ? 1 : 0;
     this.cave += (roofed - this.cave) * damp(1.6, dt);
-    const submerged = clamp((top + cam.viewH * 0.5 - w.waterY) / 160, 0, 1);
+    const submerged = clamp((top + cam.viewH * 0.5 - w.waterAt(cam.x)) / 160, 0, 1);
     // Darkness levels turn the ambient light right down: only what glows can be seen.
     const dim = (1 - this.cave * 0.42) * (1 - submerged * 0.2) * (w.level.rules.dark ?? 1) * (p.veilT > 0 ? 0.7 : 1);
     this.updateWeather(w, step, calm);
@@ -461,7 +461,7 @@ export class GameRenderer {
           this.bubbles.spawn({ frame: 'bubble', x: this.creature.x - p.facing * 8, y: this.creature.y + (rnd() - 0.5) * 8, vx: -p.vx * 0.2, vy: -18 - rnd() * 20, ttl: 0.9, s0: 3, s1: 6, alpha: 0.55 });
         }
         if (p.wading && speed > 40 && rnd() < 0.6) {
-          this.motes.spawn({ x: this.creature.x, y: w.waterY, vx: (rnd() - 0.5) * 60, vy: -50 - rnd() * 50, gravity: 500, ttl: 0.4, s0: 3, s1: 1.5, alpha: 0.7, tint: this.pal.surface });
+          this.motes.spawn({ x: this.creature.x, y: w.waterAt(p.x), vx: (rnd() - 0.5) * 60, vy: -50 - rnd() * 50, gravity: 500, ttl: 0.4, s0: 3, s1: 1.5, alpha: 0.7, tint: this.pal.surface });
         }
         if (p.danger > 0.6 && rnd() < 0.3) {
           this.sparks.spawn({ x: this.creature.x + (rnd() - 0.5) * 30, y: this.creature.y + (rnd() - 0.5) * 30, ttl: 0.5, s0: 3, s1: 1, alpha: 0.6, tint: LIGHT.dangerEye });
@@ -478,14 +478,15 @@ export class GameRenderer {
         const x = left + rnd() * (right - left);
         const gy = w.ground.at(x);
         const y = Math.min(gy - 10 - rnd() * 140, bottom - 20);
-        const under = y > w.waterY;
+        const under = y > w.waterAt(x);
         this.sparks.spawn({ x, y, vx: (rnd() - 0.5) * 16, vy: (rnd() - 0.5) * 10 - (under ? 4 : 0), ttl: 3 + rnd() * 2, s0: under ? 2.5 : 3.5, s1: 1.5, alpha: under ? 0.35 : 0.7, tint: under ? this.pal.accent : LIGHT.firefly });
       }
-      // Bubbles rising from the sea floor.
-      if (rnd() < 0.5 && w.waterY < bottom) {
+      // Bubbles rising from the floor of any water.
+      if (rnd() < 0.5) {
         const x = left + rnd() * (right - left);
         const gy = Math.min(w.ground.at(x), bottom);
-        if (gy > w.waterY + 20) this.bubbles.spawn({ frame: 'bubble', x, y: gy - 2, vx: (rnd() - 0.5) * 6, vy: -16 - rnd() * 22, ttl: Math.min(3.5, (gy - w.waterY) / 30), s0: 2.5, s1: 5.5, alpha: 0.35 });
+        const surface = w.waterAt(x);
+        if (gy > surface + 20) this.bubbles.spawn({ frame: 'bubble', x, y: gy - 2, vx: (rnd() - 0.5) * 6, vy: -16 - rnd() * 22, ttl: Math.min(3.5, (gy - surface) / 30), s0: 2.5, s1: 5.5, alpha: 0.35 });
       }
       // Wind-blown spray along the surface in rough weather.
       if (weather.wind > 0.5 && rnd() < weather.wind * 0.6 * calm && w.waterY > top && w.waterY < bottom) {

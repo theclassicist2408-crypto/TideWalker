@@ -1,6 +1,7 @@
 import { Container, type Sprite } from 'pixi.js';
 import { LIGHT, type Palette } from '../../assets/data/palettes';
 import { clamp } from '../core/util';
+import type { GateDef } from '../core/types';
 import type { World } from '../core/world';
 import { mixColor, type Gfx } from './gfx';
 import type { Lightmap } from './lightmap';
@@ -11,6 +12,9 @@ import { WaterView } from './terrainView';
  * Sprites for every prop in a level. Built once per level (and again when Drift Mode streams in
  * a new chunk); updated every frame with simple culling.
  */
+/** Which painted frame stands for each kind of gate. */
+const gateFrame = (kind: GateDef['kind']): string => (kind === 'bloom' ? 'bloom' : kind === 'arena' ? 'ward' : 'driftwood');
+
 export class EntityLayer {
   readonly back = new Container();
   readonly mid = new Container();
@@ -125,7 +129,7 @@ export class EntityLayer {
       s.tint = 0xcfe0ff;
     }
     for (const g of w.gates) {
-      const s = add(this.gates, gfx.sprite(g.kind === 'bloom' ? 'bloom' : 'driftwood', 0.5, 1), this.mid);
+      const s = add(this.gates, gfx.sprite(gateFrame(g.kind), 0.5, 1), this.mid);
       s.position.set(g.x, g.y + 2);
     }
     for (const st of w.stones) {
@@ -273,7 +277,17 @@ export class EntityLayer {
       s.visible = vis(d.x);
       if (!s.visible) continue;
       const open = d.kind === 'tide' ? d.prog : d.open ? 1 : 0;
-      const size = this.gfx.size(d.kind === 'bloom' ? 'bloom' : 'driftwood');
+      const size = this.gfx.size(gateFrame(d.kind));
+      if (d.kind === 'arena') {
+        // A ward is light: it is there while the fight lasts and gone when it ends, with a shimmer.
+        s.visible = !d.open;
+        if (!s.visible) continue;
+        s.scale.set(inv * (1 + Math.sin(t * 9 + d.x) * 0.08), (d.h / size.h) * inv);
+        s.alpha = 0.75 + Math.sin(t * 5) * 0.2;
+        s.tint = 0xffffff;
+        lights.add(d.x, d.y - 60, 70, LIGHT.danger, 0.35);
+        continue;
+      }
       const grow = d.kind === 'bloom' && !d.open ? 1 + d.prog * 0.12 : 1;
       s.scale.set(inv * (1 - open * 0.75) * grow, (d.h / size.h) * inv * (1 - open * 0.86));
       s.alpha = 1 - open * 0.55;
@@ -364,7 +378,7 @@ export class EntityLayer {
         if (Math.random() > 0.55) continue;
         const x = c.x + Math.random() * c.w;
         const y = c.y + Math.random() * c.h;
-        if (y < WaterView.surface(x, w.waterY, t) + 4) continue;
+        if (y < WaterView.surface(x, w.waterAt(x), t) + 4) continue;
         const tint = c.safe ? LIGHT.safeCurrent : 0xb8b0e0;
         if (c.radial) {
           const cx = c.x + c.w / 2;
