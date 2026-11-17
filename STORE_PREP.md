@@ -8,51 +8,49 @@ Nothing has been submitted; no store accounts, listings or builds exist yet.
 | Field | Value |
 | --- | --- |
 | Name | Tidewalker |
-| Subtitle (iOS, 30) | Carry your light home |
-| Short description (Play, 80) | A small light crosses a drowning shore. Glow to see — and to be seen. |
+| Subtitle (iOS, 30) | Take back your light |
+| Short description (Play, 80) | A fast action-platformer: ten drowned areas, ten bosses, one small light. |
 | Bundle / application id | `com.tidewalker.game` (placeholder — replace with an id you own) |
-| Version | 1.0.0 |
-| Category | Games → Adventure (secondary: Puzzle / Casual) |
+| Version | 2.0.0 |
+| Category | Games → Action (secondary: Adventure) |
 | Price | Decide before submission. The game contains no ads and no in-app purchases. |
 | Orientation | Portrait |
 | Languages | English |
 
 ## Description
 
-> The storm set you down among broken things.
+> The Tide King drowned the moon, and the fall took everything you had.
 >
-> You are a small light on a long shore, and the sea is coming back for it.
+> You are a small Tideborn with a blade of light. Take your powers back from the guardians of the
+> deep — and then take back the moon.
 >
-> **Hold to glow.** Your light shows the way: ledges of moonglass that only exist while lit, doors
-> that open to brightness, sleeping lights that wake to yours. But light spends itself — and in the
-> dark water, something is always watching for it.
+> **Tidewalker** is a fast, precise action-platformer built for touch.
 >
-> **Tidewalker** is a quiet, cinematic adventure played with one thumb.
->
-> • Ten handcrafted chapters across storm shores, moonlit pools, kelp forests, drowned ruins and a
->   glowing reef
-> • A rising tide instead of a timer: hurry and the way is dry, linger and you swim
-> • Shadow-fish you cannot fight — only outwit, hide from, or startle with a pulse of light
-> • Twenty hidden Memory Shells that tell, without a word, how you were lost
-> • Drift: an endless, peaceful shore with nothing to fear
-> • Daily Tide: one short crossing each day under a different night
-> • Gentle, Standard and Intense — every chapter and the ending are open on all three
+> • Ten drowned areas, a hundred levels, each with a twist of its own
+> • Ten bosses with phases and patterns to learn — each one leaves you a new power
+> • Twenty guardians, fourteen kinds of foe, and fights you win by reading them
+> • Run, wall-jump, double jump, dash, dive, glide and pogo off danger with a downward strike
+> • Lumen powers your Pulse, your charged strike and your gifts; Tide Essence heals you
+> • A tutorial that teaches every move before the fall
+> • Gentle, Standard and Intense — every boss stands on all three
+> • Twenty hidden Memory Shells that tell, without a word, what was lost
 > • Plays offline. No ads. No purchases. No account. Nothing tracked.
 
 ## Keywords (iOS, 100 characters)
 
-`atmospheric,adventure,ocean,light,glow,tide,relaxing,one hand,offline,story,calm,platformer`
+`action,platformer,boss,metroidvania,ocean,light,sword,challenge,offline,touch,adventure,hard`
 
-## What's new (1.0.0)
+## What's new (2.0.0)
 
-First release.
+A new game in place of the old: real combat, ten bosses, twenty guardians, fourteen enemies, a
+hundred levels across ten areas, a full tutorial, abilities and gifts to earn back, and a touch pad.
 
 ## Age rating
 
-No violence, gore, combat, gambling, user-generated content, chat, or web access.
-Mild peril (creatures in dark water; failure fades the screen and returns you to a lantern).
-Expected: Apple 4+, Google Play Everyone / PEGI 3 (questionnaire answers: no to every content category;
-"mild fantasy peril" if asked for detail).
+Fantasy combat with no blood or gore: a small creature strikes stylised sea creatures with light,
+which burst into sparks. No gambling, user-generated content, chat or web access.
+Expected: Apple 9+ (infrequent/mild cartoon or fantasy violence), Google Play Everyone 10+ /
+PEGI 7 (mild fantasy violence). Answer the questionnaires accordingly.
 
 ## Privacy
 
@@ -78,14 +76,15 @@ Expected: Apple 4+, Google Play Everyone / PEGI 3 (questionnaire answers: no to 
 
 | File | Suggested caption |
 | --- | --- |
-| `01-title.png` | Carry your light home |
-| `02-light-makes-a-way.png` | Hold to glow. Light makes a way. |
-| `03-quiet-mirrors.png` | But light is seen. |
-| `04-green-cathedral.png` | Not every lamp is a friend. |
-| `05-sunken-stair.png` | A city built for small lights. |
-| `06-nightfall-surge.png` | The sea is right behind you. |
-| `07-hearthreef.png` | Every light you wake comes with you. |
-| `08-memories.png` | Twenty shells. One story, without a word. |
+| `01-title.png` | Take back your light |
+| `02-shallows-fight.png` | Fast, exact, and every foe can be read |
+| `03-warden.png` | Ten bosses. Learn them. Beat them. |
+| `04-kelp-abyss.png` | Dive, and the fight goes under with you |
+| `05-storm-reach.png` | Ten drowned areas, a hundred levels |
+| `06-reef-pontiff.png` | Every guardian leaves you a new power |
+| `07-sunken-forge.png` | Wall-jump, dash, glide, pogo |
+| `08-tide-king.png` | He drowned the moon. Take it back. |
+| `09-the-deep.png` | Rematch any boss you have beaten |
 
 Also needed and not yet produced:
 - iPad 12.9" screenshots (2048 × 2732) if the iPad is supported: run the script with a tablet viewport.

@@ -2,96 +2,101 @@
 
 ## One line
 
-A small luminous creature must cross a drowning shoreline before nightfall, using its own light to
-reveal the way — while every glow calls something from beneath the water.
+The Tide King drowned the moon and scattered the Tideborn's powers across the deep. A small
+luminous creature with a light-blade takes them back, one guardian at a time.
 
 ## Pillars
 
-1. **Light is life, and light is risk.** One verb — glow — is both the tool and the danger. It shows
-   the path, makes moonglass solid, opens gates and wakes kin; it also spends Lumen and is seen.
-2. **The sea is the clock.** No timers on screen. The water itself rises, closes the low roads,
-   wakes what lives in it, and makes the same place harder the longer you stay.
-3. **Never cheap.** No instant deaths, no jump scares, no lives. Every threat announces itself;
-   every dangerous place has a readable way through; failing costs seconds, not minutes.
-4. **One thumb, full feel.** Everything is reachable with one hand, and every action answers with
-   motion, sound and (where the device allows) touch.
-5. **One mood.** Deep blues, small warm light, quiet music. Art, sound, text and pacing all serve it.
-
-## The creature
-
-A tideling: a round, soft body, a tapering tail, one fin, two dark eyes, a small light on a stalk.
-It hops on land, swims freely, breaches like a dolphin. It has no attack. Its animation is entirely
-procedural — squash and stretch on a damped spring, a follow-the-leader tail with a travelling
-wave, breathing, blinking, eyes that widen and a body that trembles when something is near.
+1. **Fast and exact.** Quick acceleration, short coyote time and jump buffer, variable jump height,
+   dash that carries momentum into a leap. The creature goes where the thumb says, at once.
+2. **Every fight is readable.** No attack lands without a wind-up, a marked zone or a pose. Every
+   enemy has an answer; every boss has openings and a stagger between phases.
+3. **Progress you can feel.** Powers lost in the fall come back on a schedule, each one opening
+   routes and changing fights. Boss gifts and optional guardians' upgrades add build choices.
+4. **Hard, never cheap.** Lanterns are close; a fall sends you back at once with the lesson fresh.
+   Water never kills. Difficulty changes warnings, health and toughness, never what exists.
+5. **One mood.** Deep blues, small warm light, red-violet danger, quiet generative music.
 
 ## Core loop
 
-Read the shore → choose dark or light → move with the water's rhythm → reach the next lantern.
+Read the room → move and fight through it → reach the next lantern → face the guardian → earn a
+power or gift → use it to go deeper.
 
 | System | Rule |
 | --- | --- |
-| Lumen | 100 (130 Gentle / 80 Intense). Glow drains it; open water saps it slowly. |
-| Restoring | Moon pools, glow plants, fireflies, safe (cyan) currents, lanterns. On land it trickles back to a floor so a crossing that needs light is always possible after a rest. |
-| Running dry | On land: dimmer and slower, nothing more. In open water: a visible, audible fade of several seconds, then the tide carries you to the last lantern. |
-| Lumen Pulse | Costs 20, short cooldown. Reveals a wide area, makes moonglass solid for a moment, opens bloom gates, wakes kin, and shoves fish away dazed. |
-| Hiding | Still and dark inside kelp = unseen, even at touching distance. |
-| Shadow-fish | Never one-hit: a bite steals Lumen and knocks you clear with brief invulnerability. Only a creature with no light left is caught. |
-| Tide | Derived from the terrain (`autoTide`): at an unhurried pace the sea stays a fixed margin below the walkable shore and closes that margin by the goal. |
-| Assist | Three failures at one lantern: the tide slows, fish slow, Lumen drains less, and a trail of soft lights marks the safest route until the next lantern. Nothing is announced beyond one quiet line. |
+| Health | Five masks (seven on Gentle), plus upgrades. A hit costs a mask, knocks back and grants about a second of invulnerability. |
+| Light-blade | 10 damage, side / up / down. A down-strike in the air pogoes off foes, spikes and urchins and restores the double jump and air dash. |
+| Lumen Strike | Hold Strike 0.55 s, release: 34 damage, longer reach, breaks shellback guards, thornbloom armour and cracked stone. Costs Lumen. |
+| Lumen | 100 (+25 per upgrade). Powers glow (reveals moonglass, opens bloom gates), Pulse, Lumen Strike and gifts. Refills over time, faster in moon pools. |
+| Lumen Pulse | Costs 30. Stuns and damages everything nearby, clears shots, grants a moment of safety. |
+| Tide Essence | Landing hits fills it (a charged hit counts double). Hold Mend on safe footing for ~1 s to spend one vial and heal one mask (two on Gentle). Some levels forbid healing. |
+| Gifts | One equipped at a time, switchable. Each costs Lumen and has a cooldown. |
+| Arenas | Locked fights close red-violet wards behind you and send waves; survival arenas end on a timer; failing resets the fight. |
+| Assist | Repeated falls at one lantern quietly slow the tide and lengthen warnings. |
 
-## Shadow-fish
+## Enemies
 
-| Fish | Behaviour | Tells | Answer |
+| Kind | Behaviour | Answer |
+| --- | --- | --- |
+| Skitter | Patrols, lunges | Jump the lunge, strike the recovery |
+| Spitter | Lobs arcing shots | Cut shots from the air, close in |
+| Gloomwing | Swoops in a line | Step aside, strike as it climbs |
+| Needlefish | Darts through water | Slip off its line |
+| Burrower | Hides, erupts under you | Step off the warning ring, strike while it is up |
+| Lurker | Ambush from cover | Bait it, punish the miss |
+| Shellback | Blocks from the front | Strike from behind, from above, or charged |
+| Broodmother | Spawns mites | Kill her first |
+| Mite | Fast, fragile swarmer | One hit each |
+| Stormjelly | Drifts, discharges a ring | Wait out the ring |
+| Emberhusk | Heavy, slow, slams | Keep moving, strike after the slam |
+| Thornbloom | Armoured until it opens to fire | Strike while open, or charged |
+| Voidling | Blinks and fires | Strike as it reappears |
+| Sentinel | Duels at range: shots and charges | Close in after its attack |
+
+Elites are drawn larger and paler-pink, and have half again the health. Enemy health scales gently with
+the area.
+
+## Bosses
+
+Each boss is built from shared attack primitives (charge, slam, fan, rain, spikes, beam, summon,
+blink, spiral, dive, pull, shrink, sweep), every one telegraphed. Crossing a health threshold
+staggers the boss (a chance to heal) and starts a harder phase with new attacks and shorter gaps.
+Flying bosses come down to recover, which is when they can be struck.
+
+| Area | Boss | Gift |
+| --- | --- | --- |
+| 1 | The Drowned Warden | Tidebreaker — slam down; shockwave stuns, breaks cracked stone |
+| 2 | The Moon-Eater | Eclipse Veil — dim your light; harder to see and be seen |
+| 3 | The Kelp Sovereign | Vinehook — pull yourself to a wall or foe |
+| 4 | The Abyss Choir | Echo Wave — a line of sound that wounds |
+| 5 | Squallmother | Storm Step — blink through harm |
+| 6 | The Reef Pontiff | Coral Shield — a shell that takes one blow |
+| 7 | The Cinder Smith | Ember Fang — your strikes burn |
+| 8 | The Rootmother | Bloom Burst — slow healing spores |
+| 9 | The Hush | Void Current — drag foes to you |
+| 10 | The Tide King | Tide Crown — for a few breaths, everything quickens |
+
+## Difficulty
+
+| | Gentle | Standard | Intense |
 | --- | --- | --- | --- |
-| Drifter | Patrols. Investigates light, then winds up and lunges in a straight line. | Surface ripples, a low tone, eyes kindling, a contracting violet ring before the lunge. | Go dark, move off its line, hide, or pulse. |
-| Angler | Motionless behind a false lamp. Strikes if touched or stared at with glow. | The lamp pulses unevenly and turns violet as its patience runs out; glow from a distance shows the body. | Trust lamps that have fireflies. Pass in the dark, or wide. |
-| The Hush | A huge eel on a fixed sweep, light or no light. Light makes it hurry. | Large ripples and a deep tone well before it arrives; always faintly visible. | Time the crossing, use the stones above, hide in kelp. A pulse only stalls it. |
+| Extra masks | +2 | 0 | 0 |
+| Enemy health | ×0.8 | ×1 | ×1.15 |
+| Boss health | ×0.8 | ×1 | ×1 |
+| Enemy speed | ×0.86 | ×1 | ×1.08 |
+| Telegraph time | ×1.3 | ×1 | ×0.88 |
+| Heal per vial | 2 | 1 | 1 |
+| Time limits and chases | ×1.3 | ×1 | ×0.85 |
 
-Fish stay dormant until the tide has flooded their water — the rising sea literally brings them.
+Intense bosses keep full health but attack faster with shorter warnings: harder without being longer.
 
-## Hazards and puzzle pieces
+## Presentation
 
-Moonglass (solid only in light) · crumbling ledges · currents (constant, tide-driven, pulsing,
-reversing) · whirlpools · urchins · geyser vents · bloom gates (open to glow) · tide gates (lift
-when the water reaches them) · loose stones in the ruins.
-
-## Game feel
-
-Fixed 60 Hz simulation with render interpolation; acceleration, friction and separate air control;
-coyote time (0.11 s) and jump buffering (0.14 s); variable jump height; ledge forgiveness; dash
-with after-images; camera look-ahead with a vertical dead zone; shake reserved for big impacts;
-pooled particles for splashes, ripples, bubbles, dust, trails, rain, fireflies and pulses.
-
-## Difficulty and pacing
-
-- One new mechanic per chapter (see LEVELS.md). Early chapters have no fish at all.
-- Tension rises inside each chapter with the tide, and across the story to chapter 9; chapter 10
-  releases it.
-- Gentle / Standard / Intense scale Lumen, tide speed, drain, fish speed and senses, bite size and
-  fade time. Gentle also adds lanterns. Story content is identical on all three.
-
-## Story (told without dialogue)
-
-A storm scatters the lights of a reef. One small light wakes on a wrecked shore (1), learns the sea
-is coming back (2), meets what light wakes (3), climbs the terraces (4), finds in the kelp that it
-is not the only one left (5, the midpoint), passes the breathing caves (6), climbs a drowned city
-that was built for lights like it (7), slips past its keeper (8), outruns the storm's return (9),
-and comes home, where every light it wakes follows it in (10). The 20 Memory Shells fill in what
-happened before the first chapter.
-
-## Art direction
-
-Painterly 2D silhouettes in layered parallax; a multiplied lightmap sinks unlit places into blue
-shadow and lets warm light restore true colour; additive halos for everything that glows.
-Palette per biome in `src/assets/data/palettes.ts`. Danger is darkness, motion and a red-violet
-accent — never a red warning sign.
-
-## Audio direction
-
-See [docs/AUDIO.md](docs/AUDIO.md). Generative, layered and adaptive: exploration, tension, danger,
-relief, sanctuary. As danger rises the music gets quieter and tenser, not louder.
-
-## UI
-
-Minimal and diegetic where possible: a Lumen ring, a tide gauge, shell pips, two buttons.
-Gesture hints are animated glyphs with at most two words, shown only until the action is done once.
+- **Art:** everything painted by code. Ten palettes, parallax backgrounds by biome style, a
+  procedural creature with squash, stretch and a following tail, painted enemies and bosses.
+- **Feedback:** hit-stop on landed blows, knockback, screen shake (optional), haptics (optional),
+  slash arcs, sparks, a guardian name and health bar.
+- **Audio:** a generative score per area; a danger layer swells in fights and plays at full strength
+  for guardians; muffled under water and when paused.
+- **Accessibility:** text size, reduced motion, shake toggle, visual cues for sound, handedness,
+  three difficulties; shapes and motion always back up colour.

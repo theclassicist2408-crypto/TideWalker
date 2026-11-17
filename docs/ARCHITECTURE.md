@@ -7,7 +7,7 @@ DOM, Web Audio or `localStorage`. Everything else observes it.
 
 ```
  touch / keys ──► InputManager ──► Intent ─┐
-                  (GestureRecognizer)      │
+                  (Controls: pad + keys)   │
  verification bot ──────────────► Intent ──┤
                                            ▼
                                      World.step(intent, 1/60)
@@ -20,14 +20,15 @@ DOM, Web Audio or `localStorage`. Everything else observes it.
 ```
 
 `Game` (`core/game.ts`) is the only class that knows all of them. It owns the frame loop, the
-session (story / daily / drift / title), the state machine (`title → playing ⇄ paused`,
-`playing → failed → playing`, `playing → complete`) and implements `UiHost`, the narrow interface
+session (story / tutorial / rematch / drift / title), the state machine (`title → playing ⇄ paused`,
+`playing → dead → playing` at the last lantern, `playing → complete`), hit-stop, and implements `UiHost`, the narrow interface
 the menu screens use.
 
 ## Frame
 
 1. `FixedLoop.advance(dt)` converts elapsed time into 0–5 fixed steps and an interpolation alpha.
-2. Each step: read an `Intent`, `World.step`.
+2. Each step: skip it if a landed blow is holding the frame (hit-stop), else read an `Intent` and
+   `World.step`.
 3. Drain the World's event queue: renderer (particles, squash, shake), audio, haptics, save, HUD.
 4. `AudioDirector.update` → `AudioEngine.update`.
 5. `GameRenderer.frame(world, alpha)` interpolates positions and draws.
@@ -38,17 +39,18 @@ The simulation is identical at 30, 60, 120 or 144 FPS; only smoothness changes.
 
 | Module | Responsibility |
 | --- | --- |
-| `core/world.ts` | Owns all runtime state, the event queue, checkpoints, failure, respawn, assist |
-| `entities/player.ts` | Land, air, wading and swimming physics; glow; pulse; dash; collision |
-| `entities/fish.ts` | Drifter / Angler / Hush state machines, bites, pulse reaction |
+| `core/world.ts` | Owns all runtime state, the loadout, the event queue, projectile and zone pools, checkpoints, failure, respawn, assist, `waterAt(x)` |
+| `entities/player.ts` | Run, jump, double jump, wall-cling, dash and air dash, glide, swim and dive; strikes and Lumen Strike; Pulse; healing; gifts; collision with ground, roof, platforms, blocks and gates |
+| `entities/enemies.ts` | The `ENEMY` table (14 kinds) and their wind-up → attack → rest state machines |
+| `entities/bosses.ts` | `BOSSES` (10), `MINIBOSSES` (20), the tutorial guardian; phases built from shared, telegraphed attack primitives |
 | `entities/props.ts` | Currents, moonglass, crumbling ledges, geysers, gates, stones, pickups, shells, kin |
 | `systems/terrain.ts` | `Heightfield`: piecewise-linear ground and cave roof; duplicate x = wall |
 | `systems/tide.ts` | Keyframed water level + swell + breath; trend and progress |
-| `systems/lumen.ts` | Drain, restore, shelter flags, the fade that ends a run in open water |
-| `systems/daily.ts` | Date → shore + condition; applies a condition to a level copy |
+| `systems/combat.ts` | Damage to the player, slash and Pulse resolution, gifts, arenas and waves, projectiles, telegraphed zones, spikes, level rules (chase, timer, darkness that hunts glow) |
 
 Collision is deliberately simple and robust: the creature is a small box tested against a
-heightfield (ground), an optional second heightfield (roof), one-way platforms and gate columns.
+heightfield (ground), an optional second heightfield (roof), one-way platforms, solid blocks and
+gate columns. Water is a sea level plus still water held in basins (`level.lakes`).
 There are no tiles and no physics engine.
 
 Events are plain `{type, x, y, v}` records in a fixed-size preallocated queue, so the simulation
@@ -58,7 +60,9 @@ never allocates while running.
 
 `LevelBuilder` lays terrain left to right with a cursor and places entities relative to it; it also
 records waypoints. `build()` validates the result and, with `autoTide`, derives the tide from the
-terrain. Levels are cached after first use. See `LEVELS.md`.
+terrain. Each area file (`levels/areas/aNN.ts`) lists ten level specs and a closing stretch;
+`levels/progress.ts` holds the ability schedule and the minimum loadout for any level. Levels are
+cached after first use. See `LEVELS.md`.
 
 ## Rendering (`src/game/effects`)
 
@@ -68,7 +72,10 @@ terrain. Levels are cached after first use. See `LEVELS.md`.
   (`assets/backgrounds/painters.ts`), drawn as tiling sprites in screen space.
 - **Terrain** — built lazily in 512 px chunks as the camera reaches them and freed behind it;
   each chunk also scatters biome scenery deterministically.
-- **Water** — one `Graphics` redrawn each frame for the visible span only.
+- **Water** — one `Graphics` redrawn each frame for the visible span and visible basins, from
+  reused buffers.
+- **Combat** — `combatView.ts` draws enemies, bosses, slashes, shots, telegraph zones and the
+  guardian's tells from pooled sprites.
 - **Entities** — sprites built once per level, culled by x each frame.
 - **Lightmap** — lights are drawn additively into a quarter-resolution render texture that starts at
   the biome's ambient colour, then multiplied over the scene.
@@ -78,9 +85,10 @@ terrain. Levels are cached after first use. See `LEVELS.md`.
 
 ## Input
 
-`GestureRecognizer` is a pure state machine fed `(id, x, y, t)` samples; it produces an `Intent`
-with a *latched* direction (the creature keeps travelling, so one thumb is enough) and edge-triggered
-actions. `InputManager` binds pointer and keyboard events and picks whichever the player used last.
+`Controls` is pure: fed stick positions, button presses and releases with timestamps, it writes an
+`Intent` with held states and edge-triggered actions (a tap of Light is a Pulse, a hold is a glow).
+`InputManager` binds the on-screen pad (a floating stick and six buttons, each tracking its own
+pointer) and the keyboard to it.
 
 ## Audio
 
@@ -95,7 +103,8 @@ HUD and screens are DOM, styled in one stylesheet, laid over the canvas with saf
 
 ## Save
 
-`SaveStore` is the only user of `localStorage` (key `tidewalker.save.v1`). Loading passes through
+`SaveStore` is the only user of `localStorage` (key `tidewalker.save.v2`: tutorial, unlocks,
+abilities, gifts, upgrades, guardians beaten, shells, secrets, best times, checkpoint, settings). Loading passes through
 `sanitize`, which rebuilds a valid save from anything; storage failures fall back to memory.
 
 ## Test hooks

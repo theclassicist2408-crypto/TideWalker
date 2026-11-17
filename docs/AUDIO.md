@@ -13,10 +13,10 @@ at first; thinner and lower as the sea rises; warm and full only at home.
 | Layer | Sound | Rises with |
 | --- | --- | --- |
 | Exploration | Slow chord pads and sparse bells in the biome's mode | Default; falls as tension and danger rise |
-| Tension | A low detuned drone and uneasy overtones a semitone apart | Tide height, low Lumen, nearby fish |
-| Danger | A sub drone with tremolo and a heartbeat that quickens | A fish noticing or closing on you |
+| Tension | A low detuned drone and uneasy overtones a semitone apart | Tide height, low Lumen, nearby foes |
+| Danger | A sub drone with tremolo and a heartbeat that quickens | A foe noticing or closing on you; full strength for a guardian |
 | Relief | A short rising bell phrase | Escaping danger, a lantern, a Memory Shell, the goal |
-| Sanctuary | The same harmony an octave up, brighter, with more bells | Chapter 10 and Drift |
+| Sanctuary | The same harmony an octave up, brighter, with more bells | Drift |
 
 Rule: as danger rises the melodic layers fall. The game gets *quieter* and tenser, never louder.
 `AudioDirector` (`director.ts`) holds these rules as a pure function and smooths every change over
@@ -46,11 +46,14 @@ and a deep rumble under water. Lightning calls thunder.
 
 | Cue | Sound | Visual equivalent |
 | --- | --- | --- |
-| Fish somewhere near | Soft plip / deep tone for the Hush | Ripples and bubbles on the surface |
-| Fish noticed you | Low falling tone | Eyes kindle, violet ring, HUD eye icon |
-| Fish about to strike | Rising growl | Contracting violet ring, body shake |
-| Fish off-screen and close | Danger layer, heartbeat | Violet glow on that screen edge (Visual sound cues) |
-| Near miss | Bright whoosh | White ring, small shake |
+| A foe winds up | Short rising tell | The foe crouches, swells or glows before it acts |
+| A guardian marks an area | Low warning tone | A red-violet zone with a pulsing edge, then the strike |
+| A blow lands on a foe | Thud, frame holds for a moment (hit-stop) | Flash, spark burst, knockback |
+| A blow is blocked | Metallic clang | Spark on the shell, the creature recoils |
+| You are hurt | Dull impact | A mask empties, the creature flashes, knockback |
+| Lumen Strike ready | Bright chime | The blade gathers light |
+| Arena seals / opens | Gate close / open | Red-violet wards rise / fade |
+| Guardian enters, changes phase, falls | Boss sting, stagger tone, release | Name and health bar, stagger pose, burst of light |
 | Low Lumen / fading | Two falling tones | Ring thins and core pulses; vignette closes in |
 | Vent about to blow | Rising hiss | Bubbles at the vent |
 | Stone about to fall | Two cracks | Stone wobbles, dust falls |

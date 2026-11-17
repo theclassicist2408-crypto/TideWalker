@@ -60,7 +60,8 @@ async function scene(name, start, until) {
     g.debugSpeed = 0;
     g.hud.hideCard();
   });
-  await page.waitForTimeout(900);
+  // Long enough for the level card to finish fading out.
+  await page.waitForTimeout(1800);
   await page.screenshot({ path: join(out, name) });
   console.log(name.replace('.png', ''));
 }

@@ -60,7 +60,7 @@ export interface UiHost {
 export type ScreenName = 'title' | 'areas' | 'levels' | 'settings' | 'pause' | 'complete' | 'fall' | 'gallery' | 'drift' | 'ending' | 'credits';
 
 const DIFFICULTY_TEXT: Record<Difficulty, string> = {
-  gentle: 'Two more lives, longer warnings, softer foes. Every guardian still stands.',
+  gentle: 'Two more masks, longer warnings, softer foes. Every guardian still stands.',
   standard: 'The deep as it was meant to be crossed.',
   intense: 'Shorter warnings, and foes that are faster and tougher.',
 };
