@@ -1,6 +1,6 @@
 import type { Intent } from '../core/types';
 
-export type ControlButton = 'jump' | 'attack' | 'dash' | 'light' | 'heal' | 'ability';
+export type ControlButton = 'jump' | 'attack' | 'dash' | 'light' | 'heal' | 'ability' | 'item';
 
 /** A tap of the light button is a pulse; holding it longer than this is a glow. */
 export const LIGHT_HOLD_MS = 200;
@@ -12,19 +12,20 @@ export const LIGHT_HOLD_MS = 200;
 export class Controls {
   mx = 0;
   my = 0;
-  private readonly held: Record<ControlButton, boolean> = { jump: false, attack: false, dash: false, light: false, heal: false, ability: false };
+  private readonly held: Record<ControlButton, boolean> = { jump: false, attack: false, dash: false, light: false, heal: false, ability: false, item: false };
   private qJump = false;
   private qAttack = false;
   private qDash = false;
   private qPulse = false;
   private qAbility = false;
+  private qItem = false;
   private lightAt = 0;
   private glowing = false;
 
   reset(): void {
     this.mx = this.my = 0;
     for (const k of Object.keys(this.held) as ControlButton[]) this.held[k] = false;
-    this.qJump = this.qAttack = this.qDash = this.qPulse = this.qAbility = false;
+    this.qJump = this.qAttack = this.qDash = this.qPulse = this.qAbility = this.qItem = false;
     this.glowing = false;
   }
 
@@ -41,6 +42,7 @@ export class Controls {
     else if (b === 'attack') this.qAttack = true;
     else if (b === 'dash') this.qDash = true;
     else if (b === 'ability') this.qAbility = true;
+    else if (b === 'item') this.qItem = true;
     else if (b === 'light') this.lightAt = t;
   }
 
@@ -71,6 +73,7 @@ export class Controls {
     out.glow = this.glowing;
     out.heal = this.held.heal;
     out.ability = this.qAbility;
-    this.qJump = this.qAttack = this.qDash = this.qPulse = this.qAbility = false;
+    out.item = this.qItem;
+    this.qJump = this.qAttack = this.qDash = this.qPulse = this.qAbility = this.qItem = false;
   }
 }

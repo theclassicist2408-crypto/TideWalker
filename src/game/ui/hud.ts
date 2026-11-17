@@ -24,6 +24,8 @@ const HINT_TEXT: Record<HintKind, [string, string]> = {
   boss: ['A guardian shows its strength', 'A guardian shows its strength'],
   rematch: ['Fallen guardians can be fought again from the map', 'Fallen guardians can be fought again from the map'],
   ability: ['Gift · tap its icon to switch', 'F · Q to switch'],
+  chest: ['Strike the chest open', 'X · strike it open'],
+  trial: ['Stand in the arch · push up', 'Stand in the arch · ↑'],
 };
 
 const BUTTONS: [string, string, string][] = [
@@ -56,6 +58,13 @@ export class Hud {
   private readonly card: HTMLElement;
   private readonly note: HTMLElement;
   private readonly distance: HTMLElement;
+  private readonly wallet: HTMLElement;
+  private readonly plasmaText: HTMLElement;
+  private readonly carryText: HTMLElement;
+  private readonly diamondText: HTMLElement;
+  private readonly relic: HTMLButtonElement;
+  private readonly relicName: HTMLElement;
+  private lastWallet = '';
   private last = '';
   private lastBoss = '';
   private lastHint: HintKind | null = null;
@@ -66,6 +75,7 @@ export class Hud {
   private noteTimer = 0;
   onPause: (() => void) | null = null;
   onCycle: (() => void) | null = null;
+  onRelic: (() => void) | null = null;
 
   constructor(parent: HTMLElement) {
     this.masks = h('div', { class: 'hud-masks', role: 'img' });
@@ -79,6 +89,17 @@ export class Hud {
     this.distance = h('div', { class: 'hud-distance' });
     this.giftName = h('span');
     this.gift = h('button', { class: 'hud-gift', 'aria-label': 'Switch gift', onclick: () => this.onCycle?.() }, icon('pulse', 18), this.giftName);
+    this.plasmaText = h('span');
+    this.carryText = h('small');
+    this.diamondText = h('span');
+    this.wallet = h(
+      'div',
+      { class: 'hud-wallet', role: 'status', 'aria-live': 'off' },
+      h('div', { class: 'coin plasma' }, h('i', { class: 'gem plasma-gem' }), this.plasmaText, this.carryText),
+      h('div', { class: 'coin diamond' }, h('i', { class: 'gem diamond-gem' }), this.diamondText),
+    );
+    this.relicName = h('span');
+    this.relic = h('button', { class: 'hud-relic', 'aria-label': 'Use relic', onclick: () => this.onRelic?.() }, icon('chest', 18), this.relicName);
     const pause = h('button', { class: 'hud-btn hud-pause', 'aria-label': 'Pause', onclick: () => this.onPause?.() }, icon('pause', 22));
     this.hint = h('div', { class: 'hud-hint' });
     this.card = h('div', { class: 'hud-card' });
@@ -100,6 +121,8 @@ export class Hud {
       { class: 'hud' },
       h('div', { class: 'hud-top' }, this.masks, h('div', { class: 'hud-lumen' }, this.lumen), h('div', { class: 'hud-row' }, this.essence, this.shells)),
       this.gift,
+      this.relic,
+      this.wallet,
       this.boss,
       this.timer,
       this.distance,
@@ -181,6 +204,18 @@ export class Hud {
     this.gift.classList.toggle('ready', ready);
     this.giftName.textContent = name ?? '';
     this.root.classList.toggle('has-gift', name !== null);
+  }
+
+  /** Plasma (with the part not yet banked at a lantern), diamonds, and the relic in hand. */
+  setWallet(plasma: number, carried: number, diamonds: number, relic: string | null, count: number): void {
+    const key = `${plasma}/${carried}/${diamonds}/${relic}/${count}`;
+    if (key === this.lastWallet) return;
+    this.lastWallet = key;
+    this.plasmaText.textContent = String(plasma);
+    this.carryText.textContent = carried > 0 ? `+${carried} unbanked` : '';
+    this.diamondText.textContent = String(diamonds);
+    this.relic.classList.toggle('on', relic !== null && count > 0);
+    this.relicName.textContent = relic ? `${relic} ×${count}` : '';
   }
 
   setDistance(metres: number): void {

@@ -1,5 +1,5 @@
-import { ALL_ABILITIES, ALL_REWARDS, AREA_COUNT, BASE_ESSENCE, BASE_HP, BASE_LUMEN, LEVELS_PER_AREA, SAVE_KEY } from '../core/constants';
-import type { AbilityId, Difficulty, HintKind, Loadout, RewardId, UpgradeId } from '../core/types';
+import { ALL_ABILITIES, ALL_RELICS, ALL_REWARDS, ALL_STYLES, ALL_SWORDS, AREA_COUNT, BASE_ESSENCE, BASE_HP, BASE_LUMEN, FORGE, LEVELS_PER_AREA, SAVE_KEY, STYLES, SWORDS, type ForgeId } from '../core/constants';
+import type { AbilityId, ChestDef, Difficulty, HintKind, Loadout, RelicId, RewardId, StyleId, SwordId, UpgradeId } from '../core/types';
 
 export interface Settings {
   master: number;
@@ -41,7 +41,21 @@ export interface SaveData {
   checkpoint: { level: string; index: number } | null;
   hints: Partial<Record<HintKind, boolean>>;
   endingSeen: boolean;
+  plasma: number;
+  diamonds: number;
+  forge: Record<ForgeId, number>;
+  swords: SwordId[];
+  sword: SwordId;
+  styles: StyleId[];
+  relics: Record<RelicId, number>;
+  relic: RelicId | null;
+  /** Chest and trial ids already claimed. */
+  chests: string[];
+  trials: string[];
 }
+
+/** Why a purchase was refused, or null when it went through. */
+export type BuyResult = null | 'owned' | 'max' | 'plasma' | 'diamonds' | 'locked';
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -84,6 +98,16 @@ export function defaultSave(): SaveData {
     checkpoint: null,
     hints: {},
     endingSeen: false,
+    plasma: 0,
+    diamonds: 0,
+    forge: { blade: 0, armor: 0, core: 0, flask: 0 },
+    swords: ['tide'],
+    sword: 'tide',
+    styles: [],
+    relics: { thunder: 0, frost: 0, draught: 0, nova: 0 },
+    relic: null,
+    chests: [],
+    trials: [],
   };
 }
 
@@ -140,6 +164,16 @@ export function sanitize(raw: unknown): SaveData {
     if (index >= 0) d.checkpoint = { level: raw.checkpoint.level, index };
   }
   if (isObj(raw.hints)) for (const k of Object.keys(raw.hints).slice(0, 40)) if (raw.hints[k] === true) d.hints[k as HintKind] = true;
+  d.plasma = Math.round(num(raw.plasma, 0, 0, 1e7));
+  d.diamonds = Math.round(num(raw.diamonds, 0, 0, 1e5));
+  if (isObj(raw.forge)) for (const k of Object.keys(FORGE) as ForgeId[]) d.forge[k] = Math.round(num(raw.forge[k], 0, 0, FORGE[k].max));
+  d.swords = ['tide', ...strings(raw.swords).filter((x): x is SwordId => x !== 'tide' && (ALL_SWORDS as string[]).includes(x))];
+  d.sword = typeof raw.sword === 'string' && d.swords.includes(raw.sword as SwordId) ? (raw.sword as SwordId) : 'tide';
+  d.styles = strings(raw.styles).filter((x): x is StyleId => (ALL_STYLES as string[]).includes(x));
+  if (isObj(raw.relics)) for (const k of ALL_RELICS) d.relics[k] = Math.round(num(raw.relics[k], 0, 0, 99));
+  d.relic = typeof raw.relic === 'string' && (ALL_RELICS as string[]).includes(raw.relic) ? (raw.relic as RelicId) : null;
+  d.chests = strings(raw.chests, 2000);
+  d.trials = strings(raw.trials);
   return d;
 }
 
@@ -206,11 +240,120 @@ export class SaveStore {
       abilities: new Set(d.abilities),
       rewards: new Set(d.rewards),
       equipped: d.equipped,
-      hpMax: BASE_HP + d.upgrades.health,
-      lumenMax: BASE_LUMEN + d.upgrades.lumen * 25,
-      essenceMax: BASE_ESSENCE + d.upgrades.essence,
+      hpMax: BASE_HP + d.upgrades.health + d.forge.armor,
+      lumenMax: BASE_LUMEN + d.upgrades.lumen * 25 + d.forge.core * FORGE.core.step,
+      essenceMax: BASE_ESSENCE + d.upgrades.essence + d.forge.flask,
       pulseLevel: d.upgrades.pulse,
+      sword: d.sword,
+      blade: d.forge.blade,
+      styles: new Set(d.styles),
+      relics: { ...d.relics },
+      relic: this.relicInHand(),
     };
+  }
+
+  /** The relic the item button uses: the chosen one if any are left, else the first owned. */
+  relicInHand(): RelicId | null {
+    const r = this.data.relics;
+    if (this.data.relic && r[this.data.relic] > 0) return this.data.relic;
+    return ALL_RELICS.find((k) => r[k] > 0) ?? null;
+  }
+
+  /** Furthest area the player has reached; the Forge offers what that area makes possible. */
+  get reachedArea(): number {
+    return Math.min(AREA_COUNT, Math.floor((this.data.unlocked - 1) / LEVELS_PER_AREA) + 1);
+  }
+
+  addPlasma(n: number): void {
+    if (n <= 0) return;
+    this.data.plasma += Math.round(n);
+    this.save();
+  }
+
+  addDiamonds(n: number): void {
+    if (n <= 0) return;
+    this.data.diamonds += n;
+    this.save();
+  }
+
+  private pay(plasma: number, diamonds: number): BuyResult {
+    if (this.data.plasma < plasma) return 'plasma';
+    if (this.data.diamonds < diamonds) return 'diamonds';
+    this.data.plasma -= plasma;
+    this.data.diamonds -= diamonds;
+    return null;
+  }
+
+  buyForge(id: ForgeId): BuyResult {
+    const f = FORGE[id];
+    const lvl = this.data.forge[id];
+    if (lvl >= f.max) return 'max';
+    const r = this.pay(f.plasma[lvl], f.diamonds[lvl]);
+    if (r) return r;
+    this.data.forge[id]++;
+    this.save();
+    return null;
+  }
+
+  buySword(id: SwordId): BuyResult {
+    if (this.data.swords.includes(id)) return 'owned';
+    const s = SWORDS[id];
+    if (this.reachedArea < s.area) return 'locked';
+    const r = this.pay(s.plasma, s.diamonds);
+    if (r) return r;
+    this.data.swords.push(id);
+    this.data.sword = id;
+    this.save();
+    return null;
+  }
+
+  equipSword(id: SwordId): void {
+    if (!this.data.swords.includes(id)) return;
+    this.data.sword = id;
+    this.save();
+  }
+
+  buyStyle(id: StyleId): BuyResult {
+    if (this.data.styles.includes(id)) return 'owned';
+    const s = STYLES[id];
+    if (this.reachedArea < s.area) return 'locked';
+    const r = this.pay(s.plasma, s.diamonds);
+    if (r) return r;
+    this.data.styles.push(id);
+    this.save();
+    return null;
+  }
+
+  /** Pays out a chest once. Its plasma is banked by the level; diamonds and relics land here. */
+  openChest(c: ChestDef): boolean {
+    if (this.data.chests.includes(c.id)) return false;
+    this.data.chests.push(c.id);
+    this.data.diamonds += c.diamonds;
+    if (c.relic) this.data.relics[c.relic]++;
+    this.save();
+    return true;
+  }
+
+  finishTrial(id: string): boolean {
+    if (this.data.trials.includes(id)) return false;
+    this.data.trials.push(id);
+    this.save();
+    return true;
+  }
+
+  spendRelic(id: RelicId): void {
+    if (this.data.relics[id] > 0) this.data.relics[id]--;
+    this.save();
+  }
+
+  /** Selects the next relic that is owned. */
+  cycleRelic(): RelicId | null {
+    const owned = ALL_RELICS.filter((k) => this.data.relics[k] > 0);
+    if (owned.length === 0) return null;
+    const i = this.data.relic ? owned.indexOf(this.data.relic) : -1;
+    this.data.relic = owned[(i + 1) % owned.length];
+    this.save();
+    return this.data.relic;
   }
 
   level(id: string): LevelRecord {

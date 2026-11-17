@@ -15,6 +15,7 @@ const KEYS: Record<string, ControlButton> = {
   KeyH: 'heal',
   KeyR: 'heal',
   KeyF: 'ability',
+  KeyG: 'item',
 };
 const DIRS: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
@@ -47,6 +48,8 @@ export class InputManager {
   onPauseKey: (() => void) | null = null;
   /** Called when the player asks to switch boss gifts (Q, or tapping the gift icon). */
   onCycle: (() => void) | null = null;
+  /** Called when the player asks to switch relics (T). */
+  onCycleRelic: (() => void) | null = null;
   private gestureSeen = false;
 
   constructor(pad: HTMLElement) {
@@ -167,6 +170,10 @@ export class InputManager {
       if (!e.repeat) this.onCycle?.();
       return;
     }
+    if (e.code === 'KeyT') {
+      if (!e.repeat) this.onCycleRelic?.();
+      return;
+    }
     const button = KEYS[e.code];
     if (!button && !DIRS[e.code]) return;
     e.preventDefault();
@@ -196,6 +203,14 @@ export class InputManager {
       }
     }
     this.controls.stick(Math.sign(x), Math.sign(y));
+  }
+
+  /** The relic badge was tapped: use the relic once. */
+  tapItem(): void {
+    if (!this.enabled) return;
+    const t = performance.now();
+    this.controls.press('item', t);
+    this.controls.release('item', t);
   }
 
   /** Current intent. Call once per simulation step; edge actions are consumed. */

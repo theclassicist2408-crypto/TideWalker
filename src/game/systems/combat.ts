@@ -1,4 +1,5 @@
-import { P, REWARDS } from '../core/constants';
+import { FORGE, P, REWARDS, SWORDS } from '../core/constants';
+import type { Intent } from '../core/types';
 import { clamp } from '../core/util';
 import type { World } from '../core/world';
 import { hitBoss, startBoss } from '../entities/bosses';
@@ -43,7 +44,7 @@ function overlap(ax: number, ay: number, aw: number, ah: number, bx: number, by:
 /** Applies the active slash to everything it touches. Each swing hits a target once. */
 export function resolveSlash(w: World): void {
   const p = w.player;
-  const reach = p.charged ? P.chargeReach : P.slashReach;
+  const reach = (p.charged ? P.chargeReach : P.slashReach) * p.slashReach;
   const tall = p.charged ? P.slashHeight * 1.5 : P.slashHeight;
   let x: number;
   let y: number;
@@ -65,7 +66,7 @@ export function resolveSlash(w: World): void {
     bw = reach + 6;
     bh = tall;
   }
-  const dmg = (p.charged ? P.chargeDamage : P.slashDamage) * (p.crownT > 0 ? 1.25 : 1);
+  const dmg = (p.charged ? P.chargeDamage : P.slashDamage) * strikeMul(w) * p.slashMul * (p.crownT > 0 ? 1.25 : 1);
   let landed = false;
   let bounced = false;
 
@@ -80,7 +81,7 @@ export function resolveSlash(w: World): void {
       w.emit('clang', e.x, e.y, 0);
     } else {
       landed = true;
-      if (p.emberT > 0) e.burn = 3;
+      if (p.emberT > 0 || (p.charged && w.load.sword === 'ember')) e.burn = 3;
     }
     bounced = true;
   }
@@ -99,6 +100,12 @@ export function resolveSlash(w: World): void {
     }
   }
   if (p.charged) breakBlocks(w, x - 8, y, bw + 16, bh);
+  for (let i = 0; i < w.chests.length; i++) {
+    const c = w.chests[i];
+    if (c.opened || x > c.x + 12 || x + bw < c.x - 12 || y > c.y + 10 || y + bh < c.y - 10) continue;
+    c.opened = true;
+    w.emit('chest', c.x, c.y, i);
+  }
   if (p.slashDir === 'down') {
     for (const u of w.level.urchins) if (overlap(x, y, bw, bh, u.x, u.y, u.r)) bounced = true;
     for (const s of w.level.spikes) if (x < s.x + s.w && x + bw > s.x && y < s.y + s.h && y + bh > s.y) bounced = true;
@@ -116,7 +123,165 @@ export function resolveSlash(w: World): void {
     p.airDashed = false;
     p.jumping = false;
     w.emit('pogo', p.x, p.y + P.halfH, 0);
+    if (w.load.styles.has('plunge') && landed) burst(w, p.x, p.y + 10, 56, P.slashDamage * strikeMul(w) * 0.8);
   }
+}
+
+/** How hard the sword in hand hits, with its Forge blade level. */
+export function strikeMul(w: World): number {
+  return SWORDS[w.load.sword].dmg * (1 + FORGE.blade.step * w.load.blade);
+}
+
+/** Damage to everything within `r` of a point: foes and the guardian. */
+function burst(w: World, x: number, y: number, r: number, dmg: number): void {
+  for (const e of w.enemies) {
+    if (!e.alive || !e.active || e.mode === 'hidden' || Math.hypot(e.x - x, e.y - y) > r + 12) continue;
+    hitEnemy(w, e, dmg, x, 'pulse', true);
+  }
+  const b = w.boss;
+  if (b && b.mode !== 'dead' && b.mode !== 'intro' && Math.hypot(b.x - x, b.y - y) < r + b.def.r) hitBoss(w, dmg, false);
+}
+
+/** A charged strike becomes the sword's art. The event's value says which, for the effects. */
+export function swordArt(w: World): void {
+  const p = w.player;
+  const mul = strikeMul(w);
+  const f = p.facing;
+  switch (w.load.sword) {
+    case 'tide':
+      w.spawnProjectile(p.x + f * 16, p.y, f * 380, 0, 12, 0.75, false, 'wave', 0, 20 * mul);
+      w.emit('art', p.x + f * 16, p.y, 0);
+      break;
+    case 'ember':
+      // The charged cut itself sets foes alight (see resolveSlash); a ring of fire marks it.
+      w.emit('art', p.x + f * 30, p.y, 1);
+      break;
+    case 'storm': {
+      // Lightning finds the two nearest foes ahead.
+      for (let n = 0; n < 2; n++) {
+        let best: (typeof w.enemies)[number] | null = null;
+        let bd = 300;
+        for (const e of w.enemies) {
+          if (!e.alive || !e.active || e.mode === 'hidden' || e.lastHit === p.slashId) continue;
+          const d = Math.hypot(e.x - p.x, e.y - p.y);
+          if ((e.x - p.x) * f > -40 && d < bd) {
+            bd = d;
+            best = e;
+          }
+        }
+        if (best) {
+          best.lastHit = p.slashId;
+          w.emit('art', best.x, best.y, 2);
+          hitEnemy(w, best, 26 * mul, p.x, 'pulse', true);
+        }
+      }
+      const b = w.boss;
+      if (b && b.mode !== 'dead' && b.mode !== 'intro' && Math.abs(b.x - p.x) < 300) {
+        w.emit('art', b.x, b.y, 2);
+        hitBoss(w, 30 * mul, false);
+      }
+      break;
+    }
+    case 'coral':
+      burst(w, p.x, p.y, 74, P.chargeDamage * mul * 0.8);
+      w.emit('art', p.x, p.y, 3);
+      break;
+    case 'void':
+      for (const e of w.enemies) {
+        if (!e.alive || !e.active || Math.abs(e.x - p.x) > 210 || Math.abs(e.y - p.y) > 120) continue;
+        e.vx = Math.sign(p.x - e.x) * 460;
+        e.mode = 'stun';
+        e.t = 0.5;
+      }
+      w.emit('art', p.x, p.y, 4);
+      break;
+    case 'crown':
+      for (const a of [-0.22, 0, 0.22]) w.spawnProjectile(p.x + f * 14, p.y - 2, f * 480 * Math.cos(a), 480 * Math.sin(a), 14, 0.7, false, 'echo', 0, 18 * mul);
+      w.emit('art', p.x, p.y, 5);
+      break;
+  }
+}
+
+/** Uses the selected relic: one-time power found in chests. */
+export function useRelic(w: World): void {
+  const p = w.player;
+  const id = w.load.relic;
+  if (!id || w.load.relics[id] <= 0) {
+    w.emit('relicFail', p.x, p.y, 0);
+    return;
+  }
+  const near = (x: number, y: number): boolean => Math.abs(x - p.x) < 300 && Math.abs(y - p.y) < 240;
+  const b = w.boss;
+  const bossNear = b !== null && b.mode !== 'dead' && b.mode !== 'intro' && near(b.x, b.y);
+  switch (id) {
+    case 'thunder':
+      for (const e of w.enemies) if (e.alive && e.active && e.mode !== 'hidden' && near(e.x, e.y)) hitEnemy(w, e, 45, p.x, 'pulse', true);
+      if (bossNear) hitBoss(w, 70, false);
+      break;
+    case 'frost':
+      for (const e of w.enemies) {
+        if (!e.alive || !e.active || !near(e.x, e.y)) continue;
+        e.mode = 'stun';
+        e.t = 4;
+        e.vx = 0;
+      }
+      if (b && bossNear) {
+        b.mode = 'recover';
+        b.t = 2.5;
+        b.vx = 0;
+      }
+      for (const s of w.projectiles) if (s.hostile) s.alive = false;
+      break;
+    case 'draught':
+      p.hp = w.load.hpMax;
+      p.essence = w.load.essenceMax;
+      break;
+    case 'nova':
+      burst(w, p.x, p.y, 150, 55);
+      p.invuln = Math.max(p.invuln, 0.8);
+      break;
+  }
+  w.load.relics[id]--;
+  w.emit('relic', p.x, p.y, ['thunder', 'frost', 'draught', 'nova'].indexOf(id));
+}
+
+/** Trial portals: push up at one to step through; the exit returns you once the trial is won. */
+export function updateTrials(w: World, inp: Intent, dt: number): void {
+  const p = w.player;
+  // A moment's pause after stepping through, so a held stick does not bounce straight back.
+  w.portalCd = Math.max(0, w.portalCd - dt);
+  if (inp.my > -0.5 || !p.onGround || w.portalCd > 0) return;
+  const trials = w.level.trials;
+  if (w.trialIndex < 0) {
+    for (let i = 0; i < trials.length; i++) {
+      const t = trials[i];
+      if (Math.abs(p.x - t.portalX) > 18 || Math.abs(p.y - t.portalY) > 24) continue;
+      w.trialIndex = i;
+      w.minX = t.x0;
+      w.maxX = t.x1;
+      p.x = p.prevX = p.safeX = t.spawnX;
+      p.y = p.prevY = p.safeY = t.spawnY;
+      p.vx = p.vy = 0;
+      w.portalCd = 0.8;
+      w.emit('trialEnter', p.x, p.y, i);
+      return;
+    }
+    return;
+  }
+  const t = trials[w.trialIndex];
+  let won = true;
+  for (const a of w.arenas) if (a.x0 >= t.x0 && a.x1 <= t.x1 && a.state !== 'done') won = false;
+  if (!won || Math.abs(p.x - t.exitX) > 18 || Math.abs(p.y - t.exitY) > 24) return;
+  const i = w.trialIndex;
+  w.trialIndex = -1;
+  w.minX = 10;
+  w.maxX = w.mainMaxX;
+  p.x = p.prevX = p.safeX = t.portalX;
+  p.y = p.prevY = p.safeY = t.portalY;
+  p.vx = p.vy = 0;
+  w.portalCd = 0.8;
+  w.bank();
+  w.emit('trialExit', p.x, p.y, i);
 }
 
 function breakBlocks(w: World, x: number, y: number, bw: number, bh: number): void {
@@ -249,7 +414,7 @@ export function useReward(w: World): void {
       let dist = 0;
       for (let d = 10; d <= 140; d += 10) {
         const x = p.x + p.facing * d;
-        let solid = w.ground.at(x) < p.y + P.halfH - 4 || w.ceil.at(x) > p.y - P.halfH || x < w.minX || x > w.level.width - 10;
+        let solid = w.ground.at(x) < p.y + P.halfH - 4 || w.ceil.at(x) > p.y - P.halfH || x < w.minX || x > w.maxX;
         for (const b of w.blocks) if (!b.broken && x > b.x - 9 && x < b.x + b.w + 9 && p.y > b.y - 9 && p.y < b.y + b.h + 9) solid = true;
         for (const g of w.gates) if (!g.open && Math.abs(g.x - x) < 14 && p.y > g.y - g.h && p.y < g.y) solid = true;
         if (solid) break;

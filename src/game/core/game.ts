@@ -12,7 +12,7 @@ import { ROMAN } from '../ui/dom';
 import { Hud } from '../ui/hud';
 import { Ui, type AreaView, type CompleteInfo, type Earned, type UiHost } from '../ui/screens';
 import { Bot } from './bot';
-import { FIXED_DT, LEVELS_PER_AREA, REWARDS } from './constants';
+import { ALL_RELICS, FIXED_DT, LEVELS_PER_AREA, RELICS, REWARDS } from './constants';
 import { FixedLoop } from './loop';
 import { ABILITY_NAMES, UPGRADE_NAMES } from './names';
 import { newIntent, type GameEvent, type GameMode, type HintKind, type LevelData } from './types';
@@ -83,8 +83,10 @@ export class Game implements UiHost {
     this.input.onFirstGesture = () => this.audio.unlock();
     this.input.onPauseKey = () => this.togglePause();
     this.input.onCycle = () => this.cycleGift();
+    this.input.onCycleRelic = () => this.cycleRelic();
     this.hud.onPause = () => this.togglePause();
     this.hud.onCycle = () => this.cycleGift();
+    this.hud.onRelic = () => this.input.tapItem();
     this.ui = new Ui(this.uiRoot, this);
     this.renderer.onThunder = () => this.audio.thunder();
     this.settingsChanged();
@@ -227,6 +229,7 @@ export class Game implements UiHost {
       this.input.setEnabled(true);
       this.hud.setMode(session.mode === 'drift' ? 'drift' : 'story');
       this.refreshShells();
+      this.refreshWallet();
       this.hud.setVisible(true);
       const d = session.data;
       if (session.mode === 'story') this.hud.showCard(`${ROMAN[session.area - 1]} · ${session.level}  ${areaInfo(session.area).name}`, d.name, d.twist);
@@ -245,6 +248,7 @@ export class Game implements UiHost {
       mode: session.mode,
       loadout: free ? fullLoadout() : this.save.loadout(),
       ownedShells: new Set(d.shells),
+      openedChests: new Set(d.chests),
       defeated: new Set(d.defeated),
       taken: new Set(d.grants),
       startCheckpoint: checkpoint,
@@ -296,6 +300,23 @@ export class Game implements UiHost {
     if (!next) return;
     this.world.load.equipped = next;
     this.hud.showNote(REWARDS[next].name, 'pulse');
+    this.audio.ui('toggle');
+  }
+
+  /** Plasma (banked plus carried), diamonds, and the relic in hand. */
+  private refreshWallet(): void {
+    const w = this.world;
+    const d = this.save.data;
+    const relic = w.load.relic;
+    this.hud.setWallet(d.plasma + w.plasma, w.plasma, d.diamonds, relic ? RELICS[relic].name : null, relic ? w.load.relics[relic] : 0);
+  }
+
+  private cycleRelic(): void {
+    if (this.state !== 'playing' || this.session.mode !== 'story') return;
+    const next = this.save.cycleRelic();
+    if (!next) return;
+    this.world.load.relic = next;
+    this.refreshWallet();
     this.audio.ui('toggle');
   }
 
@@ -550,6 +571,60 @@ export class Game implements UiHost {
         this.haptics.play('shell');
         this.director.triggerRelief(0.7);
         this.audio.relief(0.6);
+        break;
+      }
+      case 'bank':
+        // Plasma carried since the last lantern is safe now.
+        this.save.addPlasma(e.v);
+        this.refreshWallet();
+        break;
+      case 'plasma':
+        this.refreshWallet();
+        break;
+      case 'plasmaLost':
+        this.hud.showNote(`${e.v} plasma lost`, 'pulse');
+        this.refreshWallet();
+        break;
+      case 'diamond':
+        if (story || this.session.mode === 'rematch') {
+          this.save.addDiamonds(e.v);
+          this.hud.showNote(e.v > 1 ? `${e.v} diamonds` : 'A diamond', 'diamond');
+        }
+        this.refreshWallet();
+        break;
+      case 'chest': {
+        const c = w.chests[e.v];
+        if (!c || !story) break;
+        if (this.save.openChest(c)) {
+          this.save.addPlasma(c.plasma);
+          const parts = [c.plasma > 0 ? `${c.plasma} plasma` : '', c.diamonds > 0 ? `${c.diamonds} ◆` : '', c.relic ? RELICS[c.relic].name : ''].filter(Boolean);
+          this.hud.showNote(parts.join(' · '), 'chest');
+          if (c.relic) w.load.relics[c.relic]++;
+          if (c.relic && !w.load.relic) w.load.relic = c.relic;
+        }
+        this.refreshWallet();
+        this.haptics.play('shell');
+        this.audio.relief(0.5);
+        break;
+      }
+      case 'relic': {
+        const id = ALL_RELICS[e.v];
+        if (id && story) this.save.spendRelic(id);
+        if (id && w.load.relics[id] <= 0) w.load.relic = this.save.relicInHand();
+        this.refreshWallet();
+        this.haptics.play('hardLand');
+        break;
+      }
+      case 'trialEnter': {
+        const t = w.level.trials[e.v];
+        if (t) this.hud.showCard('Trial', t.name, 'Win the fight. The prize is past it.');
+        this.renderer.snapCamera();
+        break;
+      }
+      case 'trialExit': {
+        const t = w.level.trials[e.v];
+        if (t && story && this.save.finishTrial(t.id)) this.hud.showNote('Trial won', 'chest');
+        this.renderer.snapCamera();
         break;
       }
       case 'checkpoint':

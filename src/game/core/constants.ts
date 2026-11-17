@@ -1,4 +1,4 @@
-import type { AbilityId, Difficulty, RewardId } from './types';
+import type { AbilityId, Difficulty, RelicId, RewardId, StyleId, SwordId } from './types';
 
 /** Width of the virtual viewport in world units. Height follows the screen aspect ratio. */
 /** World width that fits a portrait phone screen: smaller means a closer camera. */
@@ -116,6 +116,59 @@ export const REWARDS: Record<RewardId, { name: string; line: string; cost: numbe
   bloom: { name: 'Bloom Burst', line: 'Spores that mend you — slowly.', cost: 45, cooldown: 16 },
   void: { name: 'Void Current', line: 'Drag nearby foes toward you.', cost: 25, cooldown: 6 },
   crown: { name: 'Tide Crown', line: 'For a few breaths, everything quickens.', cost: 50, cooldown: 20 },
+};
+
+/**
+ * Swords. `dmg` multiplies every strike, `reach` the blade's range, `speed` the time between
+ * swings (lower is faster). The art is what a charged strike becomes with this sword.
+ */
+export const SWORDS: Record<SwordId, { name: string; line: string; art: string; artLine: string; dmg: number; reach: number; speed: number; plasma: number; diamonds: number; area: number }> = {
+  tide: { name: 'Tide Blade', line: 'The blade you woke with. Honest and quick.', art: 'Tide Wave', artLine: 'A charged strike sends a wave along the ground.', dmg: 1, reach: 1, speed: 1, plasma: 0, diamonds: 0, area: 1 },
+  ember: { name: 'Ember Fang', line: 'Forged hot. Every cut keeps burning.', art: 'Flame Arc', artLine: 'A charged strike sets everything it touches alight.', dmg: 1.15, reach: 1, speed: 1, plasma: 300, diamonds: 2, area: 2 },
+  storm: { name: 'Stormcaller', line: 'Long and light. It hums before rain.', art: 'Chain Bolt', artLine: 'A charged strike calls lightning onto the nearest foes.', dmg: 1.05, reach: 1.15, speed: 0.82, plasma: 600, diamonds: 3, area: 4 },
+  coral: { name: 'Reefbreaker', line: 'Heavy coral. Slow, and it breaks things.', art: 'Thorn Spin', artLine: 'A charged strike spins, cutting all around you.', dmg: 1.35, reach: 0.95, speed: 1.12, plasma: 900, diamonds: 4, area: 5 },
+  void: { name: 'Hollow Edge', line: 'It cuts the dark itself.', art: 'Rift', artLine: 'A charged strike drags foes in, then cuts them all.', dmg: 1.45, reach: 1.1, speed: 1, plasma: 1400, diamonds: 6, area: 7 },
+  crown: { name: 'Moonbrand', line: 'Made from what he stole. It wants to go home.', art: 'Radiance', artLine: 'A charged strike throws three crescents of moonlight.', dmg: 1.7, reach: 1.2, speed: 0.9, plasma: 2500, diamonds: 10, area: 9 },
+};
+export const ALL_SWORDS = Object.keys(SWORDS) as SwordId[];
+
+/** Techniques learned at the Forge. */
+export const STYLES: Record<StyleId, { name: string; line: string; plasma: number; diamonds: number; area: number }> = {
+  combo: { name: 'Third Cut', line: 'The third quick strike in a row lands half again as hard, and wider.', plasma: 150, diamonds: 0, area: 1 },
+  rising: { name: 'Rising Cut', line: 'An upward strike on the ground lifts you with it and hits harder.', plasma: 280, diamonds: 0, area: 2 },
+  dashcut: { name: 'Dash Strike', line: 'Strike out of a dash: a piercing cut at speed, half again as hard.', plasma: 450, diamonds: 1, area: 3 },
+  plunge: { name: 'Plunge', line: 'A downward strike hits twice as hard and bursts on landing.', plasma: 650, diamonds: 2, area: 5 },
+};
+export const ALL_STYLES = Object.keys(STYLES) as StyleId[];
+
+export const RELICS: Record<RelicId, { name: string; line: string }> = {
+  thunder: { name: 'Thunder Seal', line: 'Lightning strikes every foe in sight.' },
+  frost: { name: 'Frost Seal', line: 'Every foe in sight freezes for a while.' },
+  draught: { name: 'Tide Draught', line: 'Restores all your health at once.' },
+  nova: { name: 'Nova Shard', line: 'A blast of light all around you.' },
+};
+export const ALL_RELICS = Object.keys(RELICS) as RelicId[];
+
+/** Forge upgrades: plasma cost of each level (diamonds from the level noted). */
+export const FORGE = {
+  blade: { name: 'Blade', line: 'Every strike hits harder.', max: 8, plasma: [60, 120, 200, 320, 480, 700, 950, 1250], diamonds: [0, 0, 0, 0, 1, 1, 2, 2], step: 0.12 },
+  armor: { name: 'Armour', line: 'One more mask of health.', max: 4, plasma: [100, 260, 520, 900], diamonds: [0, 1, 2, 3] },
+  core: { name: 'Lumen Core', line: 'More Lumen for glow, Pulse, arts and gifts.', max: 4, plasma: [80, 180, 340, 560], diamonds: [0, 0, 1, 2], step: 20 },
+  flask: { name: 'Essence Flask', line: 'One more vial of Tide Essence for healing.', max: 3, plasma: [150, 400, 800], diamonds: [0, 1, 2] },
+} as const;
+export type ForgeId = keyof typeof FORGE;
+
+/** Plasma and diamonds. Drops scale with the area so prices keep pace with the journey. */
+export const LOOT = {
+  enemy: 3,
+  enemyPerTier: 1.5,
+  eliteMul: 3,
+  miniboss: 60,
+  minibossPerArea: 20,
+  boss: 150,
+  bossPerArea: 50,
+  bossDiamonds: 2,
+  minibossDiamonds: 1,
 };
 
 /** Fails at one checkpoint before the game quietly helps. */

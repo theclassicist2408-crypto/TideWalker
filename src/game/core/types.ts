@@ -47,7 +47,9 @@ export type HintKind =
   | 'pause'
   | 'boss'
   | 'rematch'
-  | 'ability';
+  | 'ability'
+  | 'chest'
+  | 'trial';
 
 export interface PlatformDef {
   x: number;
@@ -303,6 +305,8 @@ export interface LevelData {
   waypoints: Waypoint[];
   tide: TideDef;
   lakes: LakeDef[];
+  chests: ChestDef[];
+  trials: TrialDef[];
   weather: WeatherDef;
   spawn: PointDef;
   goalX: number;
@@ -321,6 +325,8 @@ export interface Intent {
   glow: boolean;
   heal: boolean;
   ability: boolean;
+  /** Use the selected relic. */
+  item: boolean;
 }
 
 export const newIntent = (): Intent => ({
@@ -335,7 +341,14 @@ export const newIntent = (): Intent => ({
   glow: false,
   heal: false,
   ability: false,
+  item: false,
 });
+
+export type SwordId = 'tide' | 'ember' | 'storm' | 'coral' | 'void' | 'crown';
+/** Fighting techniques bought at the Forge. */
+export type StyleId = 'combo' | 'rising' | 'dashcut' | 'plunge';
+/** One-time attacks and remedies, found in chests. */
+export type RelicId = 'thunder' | 'frost' | 'draught' | 'nova';
 
 /** What the Tideborn currently owns. Built from the save; the tutorial grants everything. */
 export interface Loadout {
@@ -346,6 +359,44 @@ export interface Loadout {
   lumenMax: number;
   essenceMax: number;
   pulseLevel: number;
+  /** Sword in hand (default: the Tide Blade). */
+  sword?: SwordId;
+  /** Forge blade level: each adds to every strike. */
+  blade?: number;
+  styles?: ReadonlySet<StyleId>;
+  /** Relics carried into the level. */
+  relics?: Readonly<Record<RelicId, number>>;
+  /** Relic the item button uses. */
+  relic?: RelicId | null;
+}
+
+/** A chest: strike it open. Loot is paid once per save. */
+export interface ChestDef {
+  id: string;
+  x: number;
+  y: number;
+  plasma: number;
+  diamonds: number;
+  relic?: RelicId;
+  /** Trial chests are grander and hold more. */
+  grand?: boolean;
+}
+
+/**
+ * A trial: a side challenge reached through a portal on the main route. It is built beyond the
+ * goal; inside it the world is bounded to [x0, x1]. Falling there returns you to your lantern.
+ */
+export interface TrialDef {
+  id: string;
+  name: string;
+  portalX: number;
+  portalY: number;
+  x0: number;
+  x1: number;
+  spawnX: number;
+  spawnY: number;
+  exitX: number;
+  exitY: number;
 }
 
 export type EventType =
@@ -405,7 +456,18 @@ export type EventType =
   | 'assist'
   | 'respawn'
   | 'lowLumen'
-  | 'timeLow';
+  | 'timeLow'
+  | 'plasma'
+  | 'plasmaLost'
+  | 'bank'
+  | 'diamond'
+  | 'chest'
+  | 'relic'
+  | 'relicFail'
+  | 'art'
+  | 'finisher'
+  | 'trialEnter'
+  | 'trialExit';
 
 export interface GameEvent {
   type: EventType;

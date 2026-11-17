@@ -1,8 +1,8 @@
-import { P } from '../core/constants';
+import { P, SWORDS } from '../core/constants';
 import type { Intent } from '../core/types';
 import { approach, clamp, damp, sign } from '../core/util';
 import type { World } from '../core/world';
-import { resolveSlash, tidebreakerLand, useReward } from '../systems/combat';
+import { resolveSlash, swordArt, tidebreakerLand, useRelic, useReward } from '../systems/combat';
 import { pulseProps } from './props';
 
 const PROBE = 6;
@@ -119,16 +119,46 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
   const rooted = p.healT > 0;
 
   if (inp.ability && !rooted) useReward(w);
+  if (inp.item && !rooted) useRelic(w);
 
   if (p.lockT <= 0 && Math.abs(inp.mx) > 0.2 && p.dashT <= 0 && p.slashT <= 0) p.facing = sign(inp.mx);
 
   // --- Light-blade ----------------------------------------------------------------------
+  const sword = SWORDS[w.load.sword];
+  const styles = w.load.styles;
+  p.comboT = Math.max(0, p.comboT - dt);
+  p.sinceDash = p.dashT > 0 ? 0 : p.sinceDash + dt;
   if (inp.attack && p.slashCd <= 0 && !rooted) {
     p.slashDir = inp.my < -0.5 ? 'up' : inp.my > 0.5 && !p.onGround && !p.swim ? 'down' : 'side';
     p.slashT = P.slashTime;
-    p.slashCd = P.slashCooldown * (crown ? 0.7 : 1);
+    p.slashCd = P.slashCooldown * sword.speed * (crown ? 0.7 : 1);
     p.slashId = w.nextSlashId();
     p.charged = false;
+    p.slashMul = 1;
+    p.slashReach = sword.reach;
+    // Techniques learned at the Forge change what a plain strike does.
+    if (p.slashDir === 'side') {
+      p.comboN = p.comboT > 0 ? p.comboN + 1 : 1;
+      p.comboT = 0.5;
+      if (styles.has('combo') && p.comboN >= 3) {
+        p.comboN = 0;
+        p.slashMul = 1.5;
+        p.slashReach *= 1.3;
+        w.emit('finisher', p.x, p.y, p.facing);
+      }
+      if (styles.has('dashcut') && p.sinceDash < 0.15) {
+        p.slashMul *= 1.5;
+        p.slashReach *= 1.2;
+        w.emit('finisher', p.x, p.y, p.facing);
+      }
+    } else if (p.slashDir === 'up' && styles.has('rising') && p.onGround) {
+      p.slashMul = 1.25;
+      p.vy = -330;
+      p.onGround = false;
+      p.onPlatform = null;
+    } else if (p.slashDir === 'down' && styles.has('plunge')) {
+      p.slashMul = 2;
+    }
     w.emit('slash', p.x, p.y, p.slashDir === 'up' ? 1 : p.slashDir === 'down' ? 2 : 0);
   }
   if (w.has('charge') && inp.attackHeld && !rooted) {
@@ -143,7 +173,10 @@ export function updatePlayer(w: World, inp: Intent, dt: number): void {
       p.slashCd = P.slashCooldown * 1.5;
       p.slashId = w.nextSlashId();
       p.charged = true;
+      p.slashMul = 1;
+      p.slashReach = sword.reach;
       w.emit('chargeSlash', p.x, p.y, p.facing);
+      swordArt(w);
     }
     p.chargeT = 0;
   }
@@ -355,7 +388,7 @@ function integrate(w: World, dt: number): void {
   const head0 = p.y - P.halfH;
 
   // Horizontal: terrain walls, cave lips, blocks and closed gates stop the creature.
-  let nx = clamp(p.x + p.vx * dt, w.minX, w.level.width - 10);
+  let nx = clamp(p.x + p.vx * dt, w.minX, w.maxX);
   const dx = nx - p.x;
   let touched = 0;
   if (dx !== 0) {

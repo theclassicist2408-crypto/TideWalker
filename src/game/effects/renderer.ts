@@ -154,7 +154,7 @@ export class GameRenderer {
     this.flashSprite.width = w;
     this.flashSprite.height = h;
     const p = this.world?.player;
-    if (p && this.world) this.camera.snap(p.x, p.y, this.world.minX - 10, this.world.level.width);
+    if (p && this.world) this.camera.snap(p.x, p.y, this.world.minX - 10, this.world.maxX + 10);
   }
 
   setWorld(w: World): void {
@@ -168,7 +168,7 @@ export class GameRenderer {
     this.sparks.clear();
     this.bubbles.clear();
     this.creature.reset(w.player.x, w.player.y);
-    this.camera.snap(w.player.x, w.player.y, w.minX - 10, w.level.width);
+    this.camera.snap(w.player.x, w.player.y, w.minX - 10, w.maxX + 10);
     this.flash = 0;
     this.nextBolt = 4 + Math.random() * 6;
     this.cave = 0;
@@ -179,7 +179,7 @@ export class GameRenderer {
     const w = this.world;
     if (!w) return;
     this.creature.reset(w.player.x, w.player.y);
-    this.camera.snap(w.player.x, w.player.y, w.minX - 10, w.level.width);
+    this.camera.snap(w.player.x, w.player.y, w.minX - 10, w.maxX + 10);
   }
 
   /** Damage numbers: one particle per digit, floating up off the target. */
@@ -256,6 +256,79 @@ export class GameRenderer {
         }
         break;
       }
+      case 'plasma': {
+        // Beads burst off the kill and stream toward the Tideborn.
+        const p = this.world?.player;
+        const n = Math.min(10, 2 + Math.floor(v / 4));
+        for (let i = 0; i < n; i++) {
+          const tx = p ? p.x : x;
+          const ty = p ? p.y : y;
+          sp.spawn({ frame: 'plasma', x: x + (rnd() - 0.5) * 12, y: y + (rnd() - 0.5) * 12, vx: (tx - x) * 2.2 + (rnd() - 0.5) * 90, vy: (ty - y) * 2.2 - 60 - rnd() * 60, drag: 1.5, ttl: 0.55, s0: 7, s1: 3, alpha: 1, tint: 0xffffff });
+        }
+        break;
+      }
+      case 'bank':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.6, s0: 10, s1: 80, alpha: 0.8, tint: LIGHT.safeCurrent });
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          sp.spawn({ frame: 'plasma', x: x + Math.cos(a) * 40, y: y + Math.sin(a) * 40, vx: -Math.cos(a) * 90, vy: -Math.sin(a) * 90, ttl: 0.45, s0: 7, s1: 2, alpha: 1 });
+        }
+        break;
+      case 'diamond':
+        for (let i = 0; i < 3 + v * 2; i++) mo.spawn({ frame: 'diamond', x, y, vx: (rnd() - 0.5) * 200, vy: -120 - rnd() * 140, gravity: 420, ttl: 1, s0: 10, s1: 8, alpha: 1, spin: (rnd() - 0.5) * 8 });
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.6, s0: 20, s1: 140, alpha: 0.7, tint: 0xffb8f0 });
+        break;
+      case 'chest':
+        sp.spawn({ frame: 'soft', x, y: y - 8, ttl: 0.5, s0: 30, s1: 120, alpha: 0.9, tint: LIGHT.lantern });
+        for (let i = 0; i < 14; i++) sp.spawn({ frame: i % 3 ? 'plasma' : 'spark', x, y: y - 6, vx: (rnd() - 0.5) * 220, vy: -150 - rnd() * 180, gravity: 380, ttl: 0.9, s0: 7, s1: 3, alpha: 1, tint: i % 3 ? 0xffffff : LIGHT.lantern });
+        cr.squash(1.1, 0.92);
+        cam.shake(0.08);
+        break;
+      case 'relic': {
+        const tint = [0xd8e4ff, 0xbff4ff, 0xffd98a, 0xfff4d0][v] ?? 0xffffff;
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.8, s0: 20, s1: 520, alpha: 0.9, tint });
+        sp.spawn({ frame: 'soft', x, y, ttl: 0.5, s0: 60, s1: 600, alpha: 0.6, tint });
+        if (v === 0) {
+          // Thunder: bolts falling across the screen.
+          for (let i = 0; i < 8; i++) sp.spawn({ frame: 'streak', x: x + (rnd() - 0.5) * 480, y: y - 120, vy: 900, ttl: 0.3, s0: 16, s1: 16, alpha: 1, tint: 0xffffff, flat: 6 });
+          this.flash = Math.max(this.flash, 0.7);
+        }
+        for (let i = 0; i < 20; i++) sp.spawn({ frame: 'spark', x, y, vx: (rnd() - 0.5) * 500, vy: (rnd() - 0.5) * 500, drag: 2, ttl: 0.8, s0: 12, s1: 2, alpha: 1, tint, spin: 4 });
+        cam.shake(0.35);
+        break;
+      }
+      case 'relicFail':
+      case 'abilityFail':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.25, s0: 24, s1: 14, alpha: 0.6, tint: 0x8890a8 });
+        break;
+      case 'art': {
+        const tint = [LIGHT.safeCurrent, 0xff9a50, 0xe6f0ff, 0xff9ab8, 0xc890ff, 0xfff0b8][v] ?? 0xffffff;
+        if (v === 2) {
+          // Lightning from above onto the target.
+          for (let i = 0; i < 4; i++) sp.spawn({ frame: 'streak', x: x + (rnd() - 0.5) * 8, y: y - 60 - i * 40, ttl: 0.18, s0: 14, s1: 10, alpha: 1, tint: 0xffffff, flat: 5, rotation: (rnd() - 0.5) * 0.4 });
+          sp.spawn({ frame: 'ring', x, y, ttl: 0.3, s0: 10, s1: 70, alpha: 1, tint });
+          this.flash = Math.max(this.flash, 0.25);
+        } else if (v === 4) {
+          sp.spawn({ frame: 'ring', x, y, ttl: 0.4, s0: 220, s1: 10, alpha: 0.9, tint });
+        } else {
+          sp.spawn({ frame: 'ring', x, y, ttl: 0.4, s0: 16, s1: v === 3 ? 160 : 110, alpha: 0.9, tint });
+          for (let i = 0; i < 14; i++) {
+            const a = (i / 14) * Math.PI * 2;
+            sp.spawn({ frame: v === 1 ? 'soft' : 'spark', x, y, vx: Math.cos(a) * 220, vy: Math.sin(a) * 220 - (v === 1 ? 60 : 0), drag: 3, ttl: 0.5, s0: v === 1 ? 22 : 10, s1: 2, alpha: 0.9, tint });
+          }
+        }
+        cam.shake(0.15);
+        break;
+      }
+      case 'finisher':
+        sp.spawn({ frame: 'ring', x: x + v * 26, y, ttl: 0.3, s0: 10, s1: 90, alpha: 0.9, tint: LIGHT.creatureWarm });
+        cam.shake(0.1);
+        break;
+      case 'trialEnter':
+      case 'trialExit':
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.7, s0: 10, s1: 200, alpha: 0.9, tint: 0xd8a8ff });
+        this.flash = Math.max(this.flash, 0.5);
+        break;
       case 'chargeReady':
         sp.spawn({ frame: 'ring', x, y, ttl: 0.3, s0: 60, s1: 16, alpha: 0.8, tint: LIGHT.creatureWarm });
         break;
@@ -387,8 +460,9 @@ export class GameRenderer {
     this.motes.density = this.sparks.density = this.bubbles.density = this.options.reducedMotion ? 0.5 : 1;
 
     this.entities.sync(w);
+    this.creature.setSword(w.load.sword);
     this.creature.update(w, alpha, step);
-    if (!frozen) cam.update(this.creature.x, this.creature.y, p.vx, p.facing, dt, w.minX - 10, w.level.width);
+    if (!frozen) cam.update(this.creature.x, this.creature.y, p.vx, p.facing, dt, w.minX - 10, w.maxX + 10);
 
     const s = this.scale;
     const left = cam.left;

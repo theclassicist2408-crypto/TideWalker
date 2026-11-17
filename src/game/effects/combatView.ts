@@ -18,6 +18,8 @@ export class CombatLayer {
   private readonly foes: { body: Sprite; eye: Sprite }[] = [];
   private readonly shots: Sprite[] = [];
   private readonly shrines: { stone: Sprite; light: Sprite }[] = [];
+  private readonly chests: { box: Sprite; light: Sprite }[] = [];
+  private readonly arches: { arch: Sprite; light: Sprite; exit: boolean; trial: number }[] = [];
   private boss: Sprite;
   private aura: Sprite;
   private world: World | null = null;
@@ -77,6 +79,40 @@ export class CombatLayer {
       s.light.destroy();
     }
     this.shrines.length = 0;
+    for (const c of this.chests) {
+      c.box.destroy();
+      c.light.destroy();
+    }
+    this.chests.length = 0;
+    for (const a of this.arches) {
+      a.arch.destroy();
+      a.light.destroy();
+    }
+    this.arches.length = 0;
+    for (const c of w.chests) {
+      const box = this.gfx.sprite('chest', 0.5, 1);
+      box.position.set(c.x, c.y + 9);
+      if (c.grand) box.scale.set(this.gfx.inv * 1.4);
+      const light = this.gfx.sprite('soft');
+      light.blendMode = 'add';
+      light.tint = LIGHT.lantern;
+      light.position.set(c.x, c.y - 4);
+      this.back.addChild(box);
+      this.glow.addChild(light);
+      this.chests.push({ box, light });
+    }
+    w.level.trials.forEach((t, i) => {
+      for (const exit of [false, true]) {
+        const arch = this.gfx.sprite('arch', 0.5, 1);
+        arch.position.set(exit ? t.exitX : t.portalX, (exit ? t.exitY : t.portalY) + 9);
+        const light = this.gfx.sprite('soft');
+        light.blendMode = 'add';
+        light.position.set(arch.x, arch.y - 26);
+        this.back.addChild(arch);
+        this.glow.addChild(light);
+        this.arches.push({ arch, light, exit, trial: i });
+      }
+    });
     for (const g of w.grants) {
       const stone = this.gfx.sprite('shrine', 0.5, 1);
       stone.position.set(g.x, g.y + 18);
@@ -114,6 +150,36 @@ export class CombatLayer {
       s.light.scale.set((ready ? 60 + Math.sin(t * 3) * 8 : 22) / 128);
       s.light.alpha = ready ? 0.8 : 0.25;
       if (ready && g.x > left - 100 && g.x < right + 100) lights.add(g.x, g.y - 10, 110, LIGHT.lantern, 0.8);
+    }
+
+    for (let i = 0; i < this.chests.length; i++) {
+      const c = w.chests[i];
+      const v = this.chests[i];
+      const on = c.x > left - 60 && c.x < right + 60;
+      v.box.visible = v.light.visible = on;
+      if (!on) continue;
+      v.box.texture = gfx.tex(c.opened ? 'chestOpen' : 'chest');
+      // An unopened chest breathes a little light so it can be found; an open one is spent.
+      v.light.scale.set((c.opened ? 18 : 40 + Math.sin(t * 3 + i) * 6) / 128 * (c.grand ? 1.5 : 1));
+      v.light.alpha = c.opened ? 0.15 : 0.6;
+      if (!c.opened) lights.add(c.x, c.y, c.grand ? 110 : 70, LIGHT.lantern, 0.6);
+    }
+    for (const a of this.arches) {
+      const tr = w.level.trials[a.trial];
+      const x = a.arch.x;
+      const on = x > left - 80 && x < right + 80;
+      a.arch.visible = a.light.visible = on;
+      if (!on) continue;
+      // The exit only glows once its fight is won; inside a trial the entrance is irrelevant.
+      let open = !a.exit;
+      if (a.exit) {
+        open = true;
+        for (const ar of w.arenas) if (ar.x0 >= tr.x0 && ar.x1 <= tr.x1 && ar.state !== 'done') open = false;
+      }
+      a.light.tint = open ? 0xd8a8ff : 0x6a5a7a;
+      a.light.scale.set((open ? 44 + Math.sin(t * 4 + a.trial) * 6 : 20) / 128, (open ? 70 : 30) / 128);
+      a.light.alpha = open ? 0.75 : 0.25;
+      if (open) lights.add(x, a.arch.y - 26, 90, 0xc890ff, 0.55);
     }
 
     // Foes: one sprite pair each, created on demand (guardians summon more).
@@ -202,7 +268,7 @@ export class CombatLayer {
       v.position.set(s.x, s.y);
       if (s.kind === 'wave') {
         v.scale.set((s.r * 5) / 128, (s.r * 7) / 128);
-        v.tint = LIGHT.dangerEye;
+        v.tint = s.hostile ? LIGHT.dangerEye : LIGHT.safeCurrent;
       } else if (s.kind === 'echo') {
         v.scale.set((s.r * 6) / 128, (s.r * 3) / 128);
         v.tint = LIGHT.safeCurrent;

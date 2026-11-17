@@ -46,6 +46,11 @@ const ICON_PATHS: Record<string, string> = {
   storm: '<path d="M7 14a4 4 0 0 1 .500-8 5 5 0 0 1 9.500 1.500A3.300 3.300 0 0 1 17 14"/><path d="m12 12-2 4h3l-2 4"/>',
   calm: '<path d="M4 12h16"/><circle cx="12" cy="7.500" r="2"/><circle cx="12" cy="16.500" r="2" opacity=".45"/>',
   check: '<path d="m5.500 12.500 4 4 9-9.500"/>',
+  chest: '<rect x="4" y="9" width="16" height="10" rx="1.500"/><path d="M4 12h16M5 9c0-3 2.500-4 7-4s7 1 7 4"/><path d="M11 12v2.500h2V12"/>',
+  diamond: '<path d="M7 4h10l4 5-9 11L3 9z"/><path d="M3 9h18M9 4l3 16M15 4l-3 16"/>',
+  sword: '<path d="M14.500 4H20v5.500L9.500 20 7 17.500z"/><path d="M5 15l4 4M4 20l2.500-2.500"/>',
+  anvil: '<path d="M4 8h12c0 3 2 4 4 4v2H8c-2 0-4-2-4-4z"/><path d="M9 14v3M15 14v3M6 20h12"/>',
+  portal: '<ellipse cx="12" cy="12" rx="6" ry="8.500"/><ellipse cx="12" cy="12" rx="3" ry="5" opacity=".6"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.500v3M12 17.500v3M3.500 12h3M17.500 12h3M6 6l2.100 2.100M15.900 15.900 18 18M6 18l2.100-2.100M15.900 8.100 18 6"/>',
 };
 

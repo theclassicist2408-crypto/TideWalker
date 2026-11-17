@@ -2,6 +2,7 @@ import { ASSIST_AFTER_FAILS, BASE_ESSENCE, BASE_HP, BASE_LUMEN, DIFF, P, type Di
 import type {
   AbilityId,
   ArenaDef,
+  ChestDef,
   BlockDef,
   CheckpointDef,
   CurrentDef,
@@ -18,9 +19,12 @@ import type {
   LevelData,
   Loadout,
   PlatformDef,
+  RelicId,
   RewardId,
   ShellDef,
   StoneDef,
+  StyleId,
+  SwordId,
 } from './types';
 import { Heightfield, OPEN_SKY } from '../systems/terrain';
 import { Tide } from '../systems/tide';
@@ -28,7 +32,7 @@ import { updatePlayer } from '../entities/player';
 import { resetEnemies, spawnEnemy, updateEnemies } from '../entities/enemies';
 import { resetBoss, updateBoss, type BossState } from '../entities/bosses';
 import { resetProps, updateProps } from '../entities/props';
-import { updateArenas, updateHazards, updateRules } from '../systems/combat';
+import { updateArenas, updateHazards, updateRules, updateTrials } from '../systems/combat';
 
 export type SlashDir = 'side' | 'up' | 'down';
 
@@ -96,6 +100,14 @@ export interface PlayerState {
   /** Last place the creature stood safely (spikes return it here). */
   safeX: number;
   safeY: number;
+  /** Quick side strikes in a row (the Third Cut technique), and time left to continue the run. */
+  comboN: number;
+  comboT: number;
+  /** Seconds since the last dash ended (Dash Strike). */
+  sinceDash: number;
+  /** Damage and reach multipliers of the swing in progress. */
+  slashMul: number;
+  slashReach: number;
 }
 
 export type EnemyMode = 'idle' | 'windup' | 'attack' | 'rest' | 'stun' | 'hidden';
@@ -245,6 +257,10 @@ export interface GrantState extends GrantDef {
   taken: boolean;
 }
 
+export interface ChestState extends ChestDef {
+  opened: boolean;
+}
+
 export interface MutableLoadout {
   abilities: Set<AbilityId>;
   rewards: Set<RewardId>;
@@ -253,6 +269,11 @@ export interface MutableLoadout {
   lumenMax: number;
   essenceMax: number;
   pulseLevel: number;
+  sword: SwordId;
+  blade: number;
+  styles: Set<StyleId>;
+  relics: Record<RelicId, number>;
+  relic: RelicId | null;
 }
 
 export interface WorldOptions {
@@ -264,6 +285,8 @@ export interface WorldOptions {
   defeated?: ReadonlySet<string>;
   /** Grant ids (`level:index`) already taken. */
   taken?: ReadonlySet<string>;
+  /** Chest ids already opened in this save. */
+  openedChests?: ReadonlySet<string>;
   startCheckpoint?: number;
 }
 
@@ -295,6 +318,7 @@ export class World {
   readonly load: MutableLoadout;
   readonly defeated: Set<string>;
   private readonly takenGrants: ReadonlySet<string>;
+  private readonly openedChests: ReadonlySet<string>;
 
   player: PlayerState;
   enemies: EnemyState[] = [];
@@ -312,6 +336,13 @@ export class World {
   stones: StoneState[] = [];
   shells: ShellState[] = [];
   checkpoints: CheckpointState[] = [];
+  chests: ChestState[] = [];
+  /** Plasma picked up since the last lantern: banked at a lantern or the goal, lost on a fall. */
+  plasma = 0;
+  /** Index of the trial being fought, or -1 on the main route. */
+  trialIndex = -1;
+  /** Seconds before a portal can be used again. */
+  portalCd = 0;
   kin: KinState[] = [];
   grants: GrantState[] = [];
   secretsFound = new Set<string>();
@@ -332,6 +363,8 @@ export class World {
   assist = false;
   kinAwake = 0;
   minX = 10;
+  /** Right edge the creature can reach: the goal on the main route, the trial's wall inside one. */
+  maxX = 0;
   /** Chase levels: x of the advancing dark. */
   chaseX = -600;
   /** Timed levels: seconds left. */
@@ -363,13 +396,20 @@ export class World {
       lumenMax: l.lumenMax,
       essenceMax: l.essenceMax,
       pulseLevel: l.pulseLevel,
+      sword: l.sword ?? 'tide',
+      blade: l.blade ?? 0,
+      styles: new Set(l.styles ?? []),
+      relics: { thunder: 0, frost: 0, draught: 0, nova: 0, ...l.relics },
+      relic: l.relic ?? null,
     };
+    this.openedChests = opts.openedChests ?? new Set();
     for (let i = 0; i < MAX_EVENTS; i++) this.events.push({ type: 'jump', x: 0, y: 0, v: 0 });
     for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push({ alive: false, x: 0, y: 0, vx: 0, vy: 0, gravity: 0, r: 6, life: 0, dmg: 1, hostile: true, kind: 'orb', hitId: 0 });
     for (let i = 0; i < MAX_ZONES; i++) this.zones.push({ alive: false, circle: false, x: 0, y: 0, w: 0, h: 0, warn: 0, warn0: 1, dur: 0, dmg: 1, struck: false });
 
     this.addEntities(level, opts.ownedShells ?? new Set<string>());
     this.player = this.makePlayer(level.spawn.x, level.spawn.y);
+    this.maxX = this.mainMaxX;
     this.timeLeft = (level.rules.timeLimit ?? 0) * this.diff.mercy;
 
     const start = opts.startCheckpoint ?? -1;
@@ -392,6 +432,7 @@ export class World {
   private addEntities(level: LevelData, owned: ReadonlySet<string>): void {
     for (const d of level.platforms) this.platforms.push({ ...d, x0: d.x, y0: d.y, lit: 0, litT: 0, solid: d.kind !== 'moonglass', timer: -1, fallen: 0, mvx: 0, mvy: 0 });
     for (const d of level.blocks) this.blocks.push({ ...d, broken: false });
+    for (const d of level.chests) this.chests.push({ ...d, opened: this.openedChests.has(d.id) });
     for (const d of level.currents) this.currents.push({ ...d, power: 0 });
     for (const d of level.plants) this.plants.push({ x: d.x, y: d.y, cd: 0 });
     for (const d of level.fireflies) this.fireflies.push({ x: d.x, y: d.y, taken: false });
@@ -474,6 +515,11 @@ export class World {
       statusT: 0,
       safeX: x,
       safeY: y,
+      comboN: 0,
+      comboT: 0,
+      sinceDash: 9,
+      slashMul: 1,
+      slashReach: 1,
     };
   }
 
@@ -593,6 +639,7 @@ export class World {
     updateProps(this, dt);
     updatePlayer(this, intent, dt);
     if (this.status !== 'playing') return;
+    updateTrials(this, intent, dt);
     updateArenas(this, dt);
     updateEnemies(this, dt);
     updateBoss(this, dt);
@@ -615,6 +662,7 @@ export class World {
         p.hp = this.load.hpMax;
         p.lumen = this.load.lumenMax;
         this.emit('checkpoint', cp.x, cp.y, i);
+        this.bank();
       }
     }
     if (this.mode === 'tutorial' && !this.ached && p.hp >= this.load.hpMax) {
@@ -629,7 +677,8 @@ export class World {
       }
     }
     const story = this.mode === 'story' || this.mode === 'tutorial' || this.mode === 'rematch';
-    if (story && p.x >= this.level.goalX) {
+    if (story && this.trialIndex < 0 && p.x >= this.level.goalX) {
+      this.bank();
       this.status = 'complete';
       this.emit('goal', p.x, p.y, 0);
     }
@@ -647,6 +696,8 @@ export class World {
     this.failsHere++;
     this.totalFails++;
     this.emit('death', p.x, p.y, 0);
+    if (this.plasma > 0) this.emit('plasmaLost', p.x, p.y, this.plasma);
+    this.plasma = 0;
   }
 
   respawn(): void {
@@ -655,6 +706,9 @@ export class World {
     const sy = cp ? cp.y : this.level.spawn.y;
     this.player = this.makePlayer(sx, sy);
     this.player.invuln = 1;
+    this.trialIndex = -1;
+    this.minX = 10;
+    this.maxX = this.mainMaxX;
     const wasAssist = this.assist;
     this.assist = this.failsHere >= ASSIST_AFTER_FAILS;
     this.tide.setTime(this.checkpointTide * (this.assist ? 0.85 : 1));
@@ -687,6 +741,26 @@ export class World {
     this.status = 'playing';
     this.emit('respawn', sx, sy, 0);
     if (this.assist && !wasAssist) this.emit('assist', sx, sy, 0);
+  }
+
+  /** The main route ends a little past the goal; trials are built beyond it. */
+  get mainMaxX(): number {
+    const t = this.level.trials;
+    return (t.length ? t[0].x0 - 200 : this.level.width) - 10;
+  }
+
+  /** Plasma from a kill or a pickup. Only journeys that keep progress earn it. */
+  addPlasma(n: number, x: number, y: number): void {
+    if (n <= 0 || (this.mode !== 'story' && this.mode !== 'rematch')) return;
+    this.plasma += n;
+    this.emit('plasma', x, y, n);
+  }
+
+  /** Moves the plasma carried since the last lantern into the save (the game listens for 'bank'). */
+  bank(): void {
+    if (this.plasma <= 0) return;
+    this.emit('bank', this.player.x, this.player.y, this.plasma);
+    this.plasma = 0;
   }
 
   collectedShellIds(): string[] {

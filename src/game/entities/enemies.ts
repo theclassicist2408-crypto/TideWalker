@@ -1,4 +1,4 @@
-import { P } from '../core/constants';
+import { LOOT, P } from '../core/constants';
 import type { EnemyKind } from '../core/types';
 import { approach, clamp } from '../core/util';
 import type { EnemyState, SlashDir, World } from '../core/world';
@@ -132,6 +132,8 @@ export function hitEnemy(w: World, e: EnemyState, dmg: number, fromX: number, di
   if (e.hp <= 0) {
     e.alive = false;
     w.emit('hit', e.x, e.y, dmg);
+    // Summoned mites are not worth farming.
+    if (e.wave !== -1) w.addPlasma(Math.round((LOOT.enemy + LOOT.enemyPerTier * (w.tier - 1)) * (e.elite ? LOOT.eliteMul : 1)), e.x, e.y);
     w.player.lumen = Math.min(w.load.lumenMax, w.player.lumen + 6);
     w.emit('kill', e.x, e.y, s.r);
     return 'killed';

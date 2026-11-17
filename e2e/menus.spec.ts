@@ -64,3 +64,39 @@ test.describe('menus, map and progress', () => {
     await expect(page.locator('.credits')).toBeVisible();
   });
 });
+
+test.describe('the Forge', () => {
+  test('buys an upgrade with plasma, shows the new level, and refuses what cannot be afforded', async ({ page, game }) => {
+    await game.run((g) => {
+      g.save.completeTutorial();
+      g.save.addPlasma(200);
+      g.ui.show('title');
+    });
+    await page.getByRole('button', { name: 'Forge' }).tap();
+    await expect(page.locator('.forge')).toBeVisible();
+    await page.getByRole('button', { name: 'Upgrade Blade' }).tap();
+    await expect(page.locator('.forge.in .forge-wallet b').first()).toHaveText('140');
+    await expect(page.locator('.forge.in').getByLabel('Level 1 of 8')).toBeVisible();
+    await page.getByRole('button', { name: 'Upgrade Essence Flask' }).tap();
+    await expect(page.locator('.forge.in .toast')).toHaveText('Not enough plasma');
+    const save = (await game.saved()) as { forge: { blade: number }; plasma: number };
+    expect(save.forge.blade).toBe(1);
+    expect(save.plasma).toBe(140);
+  });
+
+  test('a bought sword is carried into play', async ({ page, game }) => {
+    await game.run((g) => {
+      g.save.completeTutorial();
+      g.save.data.unlocked = 20;
+      g.save.addPlasma(400);
+      g.save.addDiamonds(3);
+      g.ui.show('title');
+    });
+    await page.getByRole('button', { name: 'Forge' }).tap();
+    await page.getByRole('button', { name: 'Buy Ember Fang' }).tap();
+    await expect(page.locator('.forge.in .sword-row.equipped')).toContainText('Ember Fang');
+    await game.run((g) => g.playLevel(2, 1));
+    await game.waitState('playing');
+    expect(await game.run((g) => g.world.load.sword)).toBe('ember');
+  });
+});

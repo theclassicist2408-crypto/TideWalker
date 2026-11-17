@@ -1,4 +1,4 @@
-import type { AbilityId, ArenaDef, BiomeId, CurrentDef, EnemyKind, HintKind, LevelData, LevelRules, PlatformDef, TideDef, UpgradeId, Waypoint, WeatherDef } from '../core/types';
+import type { AbilityId, ArenaDef, RelicId, BiomeId, CurrentDef, EnemyKind, HintKind, LevelData, LevelRules, PlatformDef, TideDef, UpgradeId, Waypoint, WeatherDef } from '../core/types';
 import { P } from '../core/constants';
 import { OPEN_SKY } from '../systems/terrain';
 
@@ -33,6 +33,7 @@ export class LevelBuilder {
   private goalSet = false;
   private readonly wet: [number, number][] = [];
   private auto: { m0: number; m1: number; amp: number; period: number; pace: number } | null = null;
+  private readonly pendingTrials: { name: string; waves: string[][]; portalX: number; portalY: number; loot: Loot }[] = [];
 
   constructor(meta: LevelMeta, startY = 0) {
     this.y = startY;
@@ -57,6 +58,8 @@ export class LevelBuilder {
       kelp: [],
       pools: [],
       lakes: [],
+      chests: [],
+      trials: [],
       plants: [],
       fireflies: [],
       urchins: [],
@@ -384,6 +387,24 @@ export class LevelBuilder {
   }
 
   /** A resting light: checkpoint. */
+  /** A chest `back` px behind the cursor (raised by `up`, else on the ground). Strike it open. */
+  chest(back: number, loot: Loot, up = 0): this {
+    const x = this.x - back;
+    const y = (up > 0 ? this.y - up : this.groundAt(x)) - 9;
+    this.data.chests.push({ id: `${this.data.id}:c${this.data.chests.length}`, x, y, plasma: loot.plasma ?? 0, diamonds: loot.diamonds ?? 0, relic: loot.relic, grand: loot.grand });
+    return this;
+  }
+
+  /**
+   * A trial portal on the route, `back` px behind the cursor. The trial itself (a locked fight
+   * of `waves` and a grand chest) is built beyond the goal when the level is finished.
+   */
+  trial(name: string, waves: string[][], loot: Loot, back = 60): this {
+    const x = this.x - back;
+    this.pendingTrials.push({ name, waves, portalX: x, portalY: this.groundAt(x) - 9, loot });
+    return this;
+  }
+
   /** Where the last lantern stands (the spawn if there is none yet). */
   lastLantern(): number {
     const cps = this.data.checkpoints;
@@ -469,10 +490,32 @@ export class LevelBuilder {
     return this;
   }
 
+  /** Trials sit past the goal, each fenced off: the world bounds the creature while inside. */
+  private buildTrials(): void {
+    if (this.pendingTrials.length === 0) return;
+    this.optionalDepth++;
+    this.flat(400, false);
+    for (const t of this.pendingTrials) {
+      const x0 = this.x;
+      this.flat(140, false);
+      const spawnX = x0 + 60;
+      const spawnY = this.y - 9;
+      this.arena(560, t.waves, { lock: true });
+      this.flat(110, false);
+      this.chest(50, { ...t.loot, grand: true });
+      this.flat(130, false);
+      const exitX = this.x - 50;
+      this.data.trials.push({ id: `${this.data.id}:t${this.data.trials.length}`, name: t.name, portalX: t.portalX, portalY: t.portalY, x0, x1: this.x, spawnX, spawnY, exitX, exitY: this.y - 9 });
+      this.flat(400, false);
+    }
+    this.optionalDepth--;
+  }
+
   build(): LevelData {
     const d = this.data;
     if (this.inCave) throw new Error(`${d.id}: cave left open`);
     if (!this.goalSet) d.goalX = this.x;
+    this.buildTrials();
     this.computeAutoTide();
     this.point(this.x + 420, this.y);
     d.width = this.x + 400;
@@ -515,4 +558,12 @@ export function validateLevel(d: LevelData): void {
   for (const all of [d.plants, d.fireflies, d.shells, d.checkpoints, d.urchins, d.geysers, d.gates, d.stones, d.kin, d.grants, d.enemies]) {
     for (const e of all) if (!Number.isFinite(e.x) || !Number.isFinite(e.y) || e.x < 0 || e.x > d.width) fail('entity out of bounds');
   }
+}
+
+/** What a chest holds. */
+export interface Loot {
+  plasma?: number;
+  diamonds?: number;
+  relic?: RelicId;
+  grand?: boolean;
 }

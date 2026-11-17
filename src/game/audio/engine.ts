@@ -566,6 +566,37 @@ export class AudioEngine {
       case 'arenaClear':
         [0, 4, 7].forEach((d, i) => this.bell(this.scaleHz(d, 2), i * 0.12, 0.09, this.sfxBus));
         break;
+      case 'plasma':
+        this.tone({ freq: this.scaleHz(7 + Math.floor(Math.random() * 3), 3), dur: 0.12, gain: 0.05, type: 'triangle', wet: 0.4, pan });
+        break;
+      case 'bank':
+        [0, 4, 7].forEach((d, i) => this.tone({ freq: this.scaleHz(d, 3), dur: 0.3, gain: 0.06, delay: i * 0.05, wet: 0.5 }));
+        break;
+      case 'diamond':
+        [7, 9, 11, 14].forEach((d, i) => this.bell(this.scaleHz(d, 2), i * 0.08, 0.1, this.sfxBus));
+        break;
+      case 'chest':
+        this.burst({ dur: 0.15, freq: 500, to: 900, gain: 0.12, pan });
+        [0, 4, 7, 12].forEach((d, i) => this.bell(this.scaleHz(d, 2), 0.08 + i * 0.09, 0.1, this.sfxBus));
+        break;
+      case 'relic':
+        this.burst({ dur: 0.6, freq: 2400, to: 200, gain: 0.25, wet: 0.6 });
+        this.tone({ freq: 90, to: 40, dur: 0.6, gain: 0.25, type: 'sawtooth', cutoff: 500 });
+        break;
+      case 'relicFail':
+        this.tone({ freq: 200, to: 160, dur: 0.12, gain: 0.05, type: 'square', cutoff: 800 });
+        break;
+      case 'art':
+        this.burst({ dur: 0.35, freq: 2600, to: 500, gain: 0.18, wet: 0.5, pan });
+        this.tone({ freq: this.scaleHz(0, 2), to: this.scaleHz(7, 2), dur: 0.3, gain: 0.1, wet: 0.5 });
+        break;
+      case 'finisher':
+        this.tone({ freq: 660, to: 330, dur: 0.12, gain: 0.1, type: 'triangle', pan });
+        break;
+      case 'trialEnter':
+      case 'trialExit':
+        [0, 3, 7, 10].forEach((d, i) => this.bell(this.scaleHz(d, 1), i * 0.1, 0.1, this.sfxBus));
+        break;
       case 'pickup':
         this.tone({ freq: this.scaleHz(4 + Math.floor(Math.random() * 3), 3), dur: 0.25, gain: 0.07, wet: 0.5, pan });
         break;

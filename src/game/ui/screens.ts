@@ -1,8 +1,8 @@
 import { paintVignette, shellForVignette, VIGNETTE_COUNT } from '../../assets/data/vignettes';
-import { LEVELS_PER_AREA } from '../core/constants';
+import { ALL_RELICS, ALL_STYLES, ALL_SWORDS, FORGE, LEVELS_PER_AREA, RELICS, STYLES, SWORDS, type ForgeId } from '../core/constants';
 import type { Difficulty } from '../core/types';
 import { formatTime } from '../core/util';
-import type { SaveStore, Settings } from '../save/save';
+import type { BuyResult, SaveStore, Settings } from '../save/save';
 import { h, icon, ROMAN } from './dom';
 
 export interface LevelInfo {
@@ -57,7 +57,7 @@ export interface UiHost {
   sound(kind: 'tap' | 'open' | 'back' | 'toggle'): void;
 }
 
-export type ScreenName = 'title' | 'areas' | 'levels' | 'settings' | 'pause' | 'complete' | 'fall' | 'gallery' | 'drift' | 'ending' | 'credits';
+export type ScreenName = 'title' | 'areas' | 'levels' | 'settings' | 'pause' | 'complete' | 'fall' | 'gallery' | 'drift' | 'ending' | 'credits' | 'forge';
 
 const DIFFICULTY_TEXT: Record<Difficulty, string> = {
   gentle: 'Two more masks, longer warnings, softer foes. Every guardian still stands.',
@@ -109,6 +109,20 @@ export class Ui {
     const top = this.stack[this.stack.length - 1];
     this.cancelTimers();
     this.swap(this.build(top.name, top.params));
+  }
+
+  /** Rebuilds the current screen in place, without a fade, keeping its scroll position. */
+  private refresh(): void {
+    const top = this.stack[this.stack.length - 1];
+    const prev = this.current;
+    const next = this.build(top.name, top.params);
+    next.classList.add('in');
+    if (prev) {
+      next.scrollTop = prev.scrollTop;
+      prev.replaceWith(next);
+      next.scrollTop = prev.scrollTop;
+    } else this.root.append(next);
+    this.current = next;
   }
 
   private cancelTimers(): void {
@@ -173,6 +187,8 @@ export class Ui {
         return this.gallery();
       case 'drift':
         return this.drift();
+      case 'forge':
+        return this.forge();
       case 'ending':
         return this.ending(params as { shells: number; deaths: number });
       default:
@@ -193,6 +209,7 @@ export class Ui {
         { class: 'menu' },
         play,
         save.tutorialDone ? this.btn('The Deep', () => this.push('areas'), '', 'open') : null,
+        save.tutorialDone ? this.btn('Forge', () => this.push('forge'), '', 'open') : null,
         this.btn('Drift', () => this.push('drift'), '', 'open'),
         this.btn('Memories', () => this.push('gallery'), '', 'open'),
         h('div', { class: 'menu-row' }, this.btn('Settings', () => this.push('settings'), 'quiet', 'open'), this.btn('Credits', () => this.push('credits'), 'quiet', 'open')),
@@ -245,7 +262,107 @@ export class Ui {
       );
       list.append(card);
     }
-    return h('section', { class: 'screen panel-screen' }, this.header('The Deep'), list);
+    const forge = h('button', { class: 'icon-btn forge-link', 'aria-label': 'Forge', onclick: () => (this.host.sound('open'), this.push('forge')) }, icon('anvil', 24));
+    const head = this.header('The Deep');
+    head.append(forge);
+    return h('section', { class: 'screen panel-screen' }, head, list);
+  }
+
+  /** The Forge: spend plasma and diamonds on upgrades, swords and techniques. */
+  private forge(): HTMLElement {
+    const store = this.host.save;
+    const d = store.data;
+    const reached = store.reachedArea;
+    const rerender = (r: BuyResult): void => {
+      if (r === null) this.host.sound('open');
+      else this.host.sound('back');
+      const top = this.stack[this.stack.length - 1];
+      if (top.name === 'forge') this.refresh();
+      if (r !== null) this.flash(r === 'plasma' ? 'Not enough plasma' : r === 'diamonds' ? 'Not enough diamonds' : r === 'locked' ? 'Not yet reachable' : 'Already yours');
+    };
+    const cost = (plasma: number, diamonds: number): HTMLElement =>
+      h('span', { class: 'cost' }, h('i', { class: 'gem plasma-gem' }), h('span', { text: String(plasma) }), diamonds > 0 ? h('i', { class: 'gem diamond-gem' }) : null, diamonds > 0 ? h('span', { text: String(diamonds) }) : null);
+    const wallet = h('div', { class: 'forge-wallet' }, h('i', { class: 'gem plasma-gem' }), h('b', { text: String(d.plasma) }), h('i', { class: 'gem diamond-gem' }), h('b', { text: String(d.diamonds) }));
+
+    const upgrades = h('div', { class: 'forge-list' });
+    for (const id of Object.keys(FORGE) as ForgeId[]) {
+      const f = FORGE[id];
+      const lvl = d.forge[id];
+      const maxed = lvl >= f.max;
+      const pips = h('span', { class: 'pips', 'aria-label': `Level ${lvl} of ${f.max}` }, ...Array.from({ length: f.max }, (_, i) => h('i', { class: i < lvl ? 'on' : '' })));
+      const buy = h(
+        'button',
+        { class: 'btn small', disabled: maxed, 'aria-label': maxed ? `${f.name} complete` : `Upgrade ${f.name}`, onclick: () => rerender(store.buyForge(id)) },
+        maxed ? h('span', { text: 'Done' }) : cost(f.plasma[lvl], f.diamonds[lvl]),
+      );
+      upgrades.append(h('div', { class: 'forge-row' }, h('div', { class: 'forge-info' }, h('h4', {}, h('span', { text: f.name }), pips), h('p', { text: f.line })), buy));
+    }
+
+    const swords = h('div', { class: 'forge-list' });
+    for (const id of ALL_SWORDS) {
+      const k = SWORDS[id];
+      const owned = d.swords.includes(id);
+      const equipped = d.sword === id;
+      const locked = !owned && reached < k.area;
+      const stats = `Power ×${k.dmg.toFixed(2)} · Reach ×${k.reach.toFixed(2)} · ${k.speed < 1 ? 'Quick' : k.speed > 1 ? 'Slow' : 'Even'}`;
+      let action: HTMLElement;
+      if (equipped) action = h('span', { class: 'tag', text: 'In hand' });
+      else if (owned) action = h('button', { class: 'btn small', text: 'Equip', 'aria-label': `Equip ${k.name}`, onclick: () => (store.equipSword(id), rerender(null)) });
+      else if (locked) action = h('span', { class: 'tag muted', text: `Area ${ROMAN[k.area - 1]}` });
+      else action = h('button', { class: 'btn small', 'aria-label': `Buy ${k.name}`, onclick: () => rerender(store.buySword(id)) }, cost(k.plasma, k.diamonds));
+      swords.append(
+        h(
+          'div',
+          { class: `forge-row sword-row${equipped ? ' equipped' : ''}${locked ? ' locked' : ''}` },
+          h('span', { class: `sword-swatch sw-${id}`, 'aria-hidden': 'true' }),
+          h('div', { class: 'forge-info' }, h('h4', { text: locked ? '· · ·' : k.name }), h('p', { text: locked ? `Found when you reach area ${ROMAN[k.area - 1]}.` : k.line }), locked ? null : h('p', { class: 'stat', text: stats }), locked ? null : h('p', { class: 'art', text: `${k.art}: ${k.artLine}` })),
+          action,
+        ),
+      );
+    }
+
+    const styles = h('div', { class: 'forge-list' });
+    for (const id of ALL_STYLES) {
+      const k = STYLES[id];
+      const owned = d.styles.includes(id);
+      const locked = !owned && reached < k.area;
+      const action = owned
+        ? h('span', { class: 'tag', text: 'Learned' })
+        : locked
+          ? h('span', { class: 'tag muted', text: `Area ${ROMAN[k.area - 1]}` })
+          : h('button', { class: 'btn small', 'aria-label': `Learn ${k.name}`, onclick: () => rerender(store.buyStyle(id)) }, cost(k.plasma, k.diamonds));
+      styles.append(h('div', { class: 'forge-row' }, h('div', { class: 'forge-info' }, h('h4', { text: k.name }), h('p', { text: k.line })), action));
+    }
+
+    const relics = h('div', { class: 'relic-list' });
+    for (const id of ALL_RELICS) {
+      const n = d.relics[id];
+      relics.append(h('div', { class: `relic-chip${n > 0 ? '' : ' none'}` }, h('b', { text: RELICS[id].name }), h('span', { text: `×${n}` }), h('small', { text: RELICS[id].line })));
+    }
+
+    return h(
+      'section',
+      { class: 'screen panel-screen forge' },
+      this.header('Forge'),
+      wallet,
+      h('p', { class: 'note center', text: 'Plasma falls from every foe and is kept at each lantern. Diamonds come from guardians, chests and trials.' }),
+      h('h3', { class: 'forge-h', text: 'Upgrades' }),
+      upgrades,
+      h('h3', { class: 'forge-h', text: 'Swords' }),
+      swords,
+      h('h3', { class: 'forge-h', text: 'Techniques' }),
+      styles,
+      h('h3', { class: 'forge-h', text: 'Relics' }),
+      h('p', { class: 'note', text: 'One-time powers found in chests. Tap the relic badge in play (G on a keyboard, T to switch).' }),
+      relics,
+    );
+  }
+
+  /** A short message at the foot of the current screen. */
+  private flash(text: string): void {
+    const el = h('div', { class: 'toast', role: 'status', text });
+    this.current?.append(el);
+    window.setTimeout(() => el.remove(), 1800);
   }
 
   private levels(area: number): HTMLElement {
@@ -426,7 +543,7 @@ export class Ui {
       c.shellIds.length ? shells : null,
       stats,
       earned,
-      h('nav', { class: 'menu' }, next, this.btn('Again', () => this.host.restartLevel()), c.next !== 'map' ? this.btn('The Deep', () => this.host.quitToTitle('areas'), 'quiet') : null),
+      h('nav', { class: 'menu' }, next, h('div', { class: 'menu-row' }, this.btn('Forge', () => this.push('forge'), 'quiet', 'open'), this.btn('Again', () => this.host.restartLevel(), 'quiet')), c.next !== 'map' ? this.btn('The Deep', () => this.host.quitToTitle('areas'), 'quiet') : null),
     );
   }
 

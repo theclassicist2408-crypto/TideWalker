@@ -98,6 +98,41 @@ const SWORD_PAINTERS = Object.fromEntries(
   ]),
 );
 
+
+function paintChest(c: Ctx, w: number, h: number, open: boolean): void {
+  const lidY = open ? 2 : 6;
+  // Body.
+  c.fillStyle = linear(c, 0, 8, 0, h, [
+    [0, '#8a5a3a'],
+    [1, '#4a2a1a'],
+  ]);
+  c.fillRect(2, 10, w - 4, h - 11);
+  // Glow spilling out when open.
+  if (open) {
+    c.fillStyle = radial(c, w / 2, 10, 12, [
+      [0, 'rgba(255,240,200,0.9)'],
+      [1, 'rgba(255,217,138,0)'],
+    ]);
+    c.fillRect(0, 0, w, 14);
+  }
+  // Lid.
+  c.fillStyle = linear(c, 0, lidY, 0, lidY + 6, [
+    [0, '#b07848'],
+    [1, '#6a4028'],
+  ]);
+  c.beginPath();
+  c.moveTo(2, lidY + 5);
+  c.quadraticCurveTo(w / 2, lidY - 4, w - 2, lidY + 5);
+  c.closePath();
+  c.fill();
+  // Brass bands and lock.
+  c.fillStyle = '#ffd98a';
+  c.fillRect(5, 10, 2, h - 11);
+  c.fillRect(w - 7, 10, 2, h - 11);
+  c.fillRect(2, 10, w - 4, 1.4);
+  if (!open) c.fillRect(w / 2 - 2, 9, 4, 5);
+}
+
 const painters: Record<string, { w: number; h: number; paint: Painter }> = {
   /** Soft falloff used for every light, halo and mote. */
   soft: {
@@ -1361,6 +1396,91 @@ Object.assign(painters, {
       },
     ]),
   ),
+  /** A sea-chest of driftwood bound in brass. Closed and open frames. */
+  chest: {
+    w: 26,
+    h: 22,
+    paint: (c: Ctx, w: number, h: number) => paintChest(c, w, h, false),
+  },
+  chestOpen: {
+    w: 26,
+    h: 22,
+    paint: (c: Ctx, w: number, h: number) => paintChest(c, w, h, true),
+  },
+  /** A trial arch: two coral pillars and a lintel. The light inside is drawn separately. */
+  arch: {
+    w: 44,
+    h: 60,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.fillStyle = linear(c, 0, 0, w, 0, [
+        [0, '#5a3a6a'],
+        [0.5, '#9a6aa8'],
+        [1, '#4a2a5a'],
+      ]);
+      c.beginPath();
+      c.moveTo(3, h);
+      c.lineTo(3, 22);
+      c.quadraticCurveTo(3, 3, w / 2, 3);
+      c.quadraticCurveTo(w - 3, 3, w - 3, 22);
+      c.lineTo(w - 3, h);
+      c.lineTo(w - 11, h);
+      c.lineTo(w - 11, 24);
+      c.quadraticCurveTo(w - 11, 11, w / 2, 11);
+      c.quadraticCurveTo(11, 11, 11, 24);
+      c.lineTo(11, h);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#ffd98a';
+      c.lineWidth = 1.2;
+      c.stroke();
+      // Keystone.
+      c.fillStyle = '#ffd98a';
+      c.beginPath();
+      c.moveTo(w / 2 - 4, 1);
+      c.lineTo(w / 2 + 4, 1);
+      c.lineTo(w / 2 + 2.5, 9);
+      c.lineTo(w / 2 - 2.5, 9);
+      c.closePath();
+      c.fill();
+    },
+  },
+  /** Plasma: a bright bead; diamond: a cut gem. */
+  plasma: {
+    w: 12,
+    h: 12,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.fillStyle = radial(c, w / 2 - 1, h / 2 - 1, w / 2, [
+        [0, '#ffffff'],
+        [0.4, '#c8f8ff'],
+        [1, 'rgba(143,240,255,0)'],
+      ]);
+      c.fillRect(0, 0, w, h);
+    },
+  },
+  diamond: {
+    w: 14,
+    h: 16,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.beginPath();
+      c.moveTo(w / 2, 1);
+      c.lineTo(w - 1, h * 0.38);
+      c.lineTo(w / 2, h - 1);
+      c.lineTo(1, h * 0.38);
+      c.closePath();
+      c.fillStyle = linear(c, 0, 0, w, h, [
+        [0, '#ffffff'],
+        [0.5, '#ffb8f0'],
+        [1, '#a050c8'],
+      ]);
+      c.fill();
+      c.strokeStyle = 'rgba(255,255,255,0.8)';
+      c.lineWidth = 0.8;
+      c.beginPath();
+      c.moveTo(1, h * 0.38);
+      c.lineTo(w - 1, h * 0.38);
+      c.stroke();
+    },
+  },
   /** A thin cut mark left where a blade passes through a foe. */
   cut: {
     w: 48,

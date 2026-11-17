@@ -1,4 +1,4 @@
-import { P } from '../core/constants';
+import { LOOT, P } from '../core/constants';
 import type { EnemyKind, RewardId } from '../core/types';
 import { approach, clamp, makeRng } from '../core/util';
 import type { World } from '../core/world';
@@ -237,7 +237,12 @@ export function hitBoss(w: World, dmg: number, burn: boolean): void {
     b.mode = 'dead';
     b.t = 0;
     b.vx = 0;
+    const first = !w.defeated.has(b.def.id);
     w.defeated.add(b.def.id);
+    const area = Math.max(1, b.def.area);
+    w.addPlasma(b.def.mini ? LOOT.miniboss + LOOT.minibossPerArea * area : LOOT.boss + LOOT.bossPerArea * area, b.x, b.y);
+    // Diamonds only the first time a guardian falls: rematches are for glory and plasma.
+    if (first && b.def.id !== 'echo') w.emit('diamond', b.x, b.y, b.def.mini ? LOOT.minibossDiamonds : LOOT.bossDiamonds);
     for (const e of w.enemies) if (e.arena === b.arena && e.alive) e.alive = false;
     for (const z of w.zones) z.alive = false;
     for (const s of w.projectiles) if (s.hostile) s.alive = false;
