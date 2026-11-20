@@ -1,8 +1,9 @@
-import { ASSIST_AFTER_FAILS, BASE_ESSENCE, BASE_HP, BASE_LUMEN, DIFF, P, type DifficultyTuning } from './constants';
+import { ASSIST_AFTER_FAILS, BASE_ESSENCE, BASE_HP, BASE_LUMEN, DIFF, DRILL_REPS, DRILLS, P, type DifficultyTuning } from './constants';
 import type {
   AbilityId,
   ArenaDef,
   ChestDef,
+  DrillId,
   BlockDef,
   CheckpointDef,
   CurrentDef,
@@ -343,6 +344,11 @@ export class World {
   plasma = 0;
   /** Index of the trial being fought, or -1 on the main route. */
   trialIndex = -1;
+  /** Training: how many times each move has been done (tutorial only). */
+  readonly drills: Record<DrillId, number> = Object.fromEntries(DRILLS.map((d) => [d.id, 0])) as Record<DrillId, number>;
+  private glideT = 0;
+  private deep = false;
+  private wasSwim = false;
   /** Seconds before a portal can be used again. */
   portalCd = 0;
   kin: KinState[] = [];
@@ -546,6 +552,7 @@ export class World {
   }
 
   emit(type: EventType, x: number, y: number, v = 0): void {
+    if (this.mode === 'tutorial') this.countDrill(type, v);
     if (this.eventCount >= MAX_EVENTS) return;
     const e = this.events[this.eventCount++];
     e.type = type;
@@ -643,6 +650,7 @@ export class World {
     updatePlayer(this, intent, dt);
     if (this.status !== 'playing') return;
     updateTrials(this, intent, dt);
+    if (this.mode === 'tutorial') this.trackDrills(dt);
     updateArenas(this, dt);
     updateEnemies(this, dt);
     updateBoss(this, dt);
@@ -668,13 +676,18 @@ export class World {
         this.bank();
       }
     }
-    if (this.mode === 'tutorial' && !this.ached && p.hp >= this.load.hpMax) {
-      // The healing lesson needs something to heal: an old wound aches as the creature reaches it.
+    if (this.mode === 'tutorial' && (!this.ached || this.drills.heal < DRILL_REPS)) {
+      // The healing lesson needs something to heal and something to heal with: an old wound
+      // aches here, and the Essence for mending is given. It reaches from the lesson to its
+      // training gate, past the lantern that refills health.
+      let end = 0;
+      for (const g of this.gates) if (g.kind === 'drill' && g.drills?.includes('heal')) end = g.x;
       for (const h of this.level.hints) {
-        if (h.kind === 'heal' && p.x > h.x && p.x < h.x + h.w) {
-          this.ached = true;
+        if (h.kind !== 'heal' || p.x <= h.x || p.x >= Math.max(h.x + h.w, end)) continue;
+        this.ached = true;
+        if (p.essence < 1) p.essence = this.load.essenceMax;
+        if (p.hp >= this.load.hpMax) {
           p.hp -= 2;
-          p.essence = this.load.essenceMax;
           this.emit('hurt', p.x, p.y, 0);
         }
       }
@@ -744,6 +757,57 @@ export class World {
     this.status = 'playing';
     this.emit('respawn', sx, sy, 0);
     if (this.assist && !wasAssist) this.emit('assist', sx, sy, 0);
+  }
+
+  /** Training: which move an event shows, if any. */
+  private countDrill(type: EventType, v: number): void {
+    const p = this.player;
+    let d: DrillId | null = null;
+    if (type === 'jump' && v === 0) d = 'jump';
+    else if (type === 'doubleJump') d = 'double';
+    else if (type === 'wallJump') d = 'wall';
+    else if (type === 'dash') d = p.onGround || p.swim ? 'dash' : 'airdash';
+    else if (type === 'slash') d = v === 1 ? 'upstrike' : v === 2 ? 'downstrike' : 'strike';
+    else if (type === 'finisher') d = 'combo';
+    else if (type === 'chargeSlash') d = 'charge';
+    else if (type === 'glowOn') d = 'glow';
+    else if (type === 'pulse') d = 'pulse';
+    else if (type === 'heal') d = 'heal';
+    if (d) this.addDrill(d);
+  }
+
+  addDrill(d: DrillId): void {
+    if (this.drills[d] >= DRILL_REPS) return;
+    this.drills[d]++;
+    // Recorded straight into the queue: a drill is news, not a move.
+    if (this.eventCount < MAX_EVENTS) {
+      const e = this.events[this.eventCount++];
+      e.type = 'drill';
+      e.x = this.player.x;
+      e.y = this.player.y;
+      e.v = DRILLS.findIndex((k) => k.id === d);
+    }
+  }
+
+  /** Training moves with no event of their own: a held glide, a dive below the surface. */
+  private trackDrills(dt: number): void {
+    const p = this.player;
+    this.glideT = p.gliding ? this.glideT + dt : 0;
+    if (this.glideT > 0.3 && this.glideT - dt <= 0.3) this.addDrill('glide');
+    if (p.swim && !this.wasSwim) this.addDrill('swim');
+    this.wasSwim = p.swim;
+    const deep = p.swim && p.y > this.waterAt(p.x) + 40;
+    if (deep && !this.deep) this.addDrill('dive');
+    this.deep = deep;
+    for (const g of this.gates) {
+      if (g.kind !== 'drill' || g.open || !g.drills) continue;
+      let done = true;
+      for (const d of g.drills) if (this.drills[d] < DRILL_REPS) done = false;
+      if (done) {
+        g.open = true;
+        this.emit('gateOpen', g.x, g.y - g.h / 2, 3);
+      }
+    }
   }
 
   /** The main route ends a little past the goal; trials are built beyond it. */

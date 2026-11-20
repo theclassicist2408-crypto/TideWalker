@@ -25,6 +25,8 @@ const HINT_TEXT: Record<HintKind, [string, string]> = {
   rematch: ['Fallen guardians can be fought again from the map', 'Fallen guardians can be fought again from the map'],
   ability: ['Gift · tap its icon to switch', 'F · 1 to switch'],
   chest: ['Strike the chest open', 'X · strike it open'],
+  upstrike: ['Stick up + Strike', 'W + X'],
+  combo: ['Strike three times, quickly', 'X X X'],
   trial: ['Stand in the arch · push up', 'Stand in the arch · W'],
 };
 
@@ -65,6 +67,8 @@ export class Hud {
   private readonly relic: HTMLButtonElement;
   private readonly relicName: HTMLElement;
   private lastWallet = '';
+  private readonly drills: HTMLElement;
+  private lastDrills = '';
   private last = '';
   private lastBoss = '';
   private lastHint: HintKind | null = null;
@@ -98,6 +102,7 @@ export class Hud {
       h('div', { class: 'coin plasma' }, h('i', { class: 'gem plasma-gem' }), this.plasmaText, this.carryText),
       h('div', { class: 'coin diamond' }, h('i', { class: 'gem diamond-gem' }), this.diamondText),
     );
+    this.drills = h('div', { class: 'hud-drills', role: 'status' });
     this.relicName = h('span');
     this.relic = h('button', { class: 'hud-relic', 'aria-label': 'Use relic', onclick: () => this.onRelic?.() }, icon('chest', 18), this.relicName);
     const pause = h('button', { class: 'hud-btn hud-pause', 'aria-label': 'Pause', onclick: () => this.onPause?.() }, icon('pause', 22));
@@ -123,6 +128,7 @@ export class Hud {
       this.gift,
       this.relic,
       this.wallet,
+      this.drills,
       this.boss,
       this.timer,
       this.distance,
@@ -216,6 +222,29 @@ export class Hud {
     this.diamondText.textContent = String(diamonds);
     this.relic.classList.toggle('on', relic !== null && count > 0);
     this.relicName.textContent = relic ? `${relic} ×${count}` : '';
+  }
+
+  /**
+   * Training checklist: moves mastered out of all, and the moves the next gate is waiting for,
+   * each with a pip per repetition (filled pips, not colour alone, show what is done).
+   */
+  setDrills(done: number, total: number, items: { name: string; n: number; need: number }[] | null): void {
+    const key = items === null ? '' : `${done}/${total}/${items.map((i) => `${i.name}${i.n}`).join(',')}`;
+    if (key === this.lastDrills) return;
+    this.lastDrills = key;
+    this.drills.classList.toggle('on', items !== null);
+    if (!items) return;
+    this.drills.replaceChildren(
+      h('div', { class: 'drill-head', text: done >= total ? 'Training complete' : `Training · ${done}/${total} moves` }),
+      ...items.map((i) =>
+        h(
+          'div',
+          { class: `drill${i.n >= i.need ? ' done' : ''}` },
+          h('span', { text: i.name }),
+          h('span', { class: 'pips', 'aria-label': `${i.n} of ${i.need}` }, ...Array.from({ length: i.need }, (_, k) => h('i', { class: k < i.n ? 'on' : '' }))),
+        ),
+      ),
+    );
   }
 
   setDistance(metres: number): void {

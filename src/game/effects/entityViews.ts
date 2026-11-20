@@ -13,7 +13,7 @@ import { WaterView } from './terrainView';
  * a new chunk); updated every frame with simple culling.
  */
 /** Which painted frame stands for each kind of gate. */
-const gateFrame = (kind: GateDef['kind']): string => (kind === 'bloom' ? 'bloom' : kind === 'arena' ? 'ward' : 'driftwood');
+const gateFrame = (kind: GateDef['kind']): string => (kind === 'bloom' ? 'bloom' : kind === 'arena' ? 'ward' : kind === 'drill' ? 'trainWard' : 'driftwood');
 
 export class EntityLayer {
   readonly back = new Container();
@@ -278,14 +278,16 @@ export class EntityLayer {
       if (!s.visible) continue;
       const open = d.kind === 'tide' ? d.prog : d.open ? 1 : 0;
       const size = this.gfx.size(gateFrame(d.kind));
-      if (d.kind === 'arena') {
-        // A ward is light: it is there while the fight lasts and gone when it ends, with a shimmer.
-        s.visible = !d.open;
+      if (d.kind === 'arena' || d.kind === 'drill') {
+        // A ward is light: it is there while the fight (or the lesson) lasts and gone when it ends.
+        // Training wards are warm gold, not the red-violet of danger.
+        const training = d.kind === 'drill';
+        s.visible = training ? d.prog < 0.98 : !d.open;
         if (!s.visible) continue;
-        s.scale.set(inv * (1 + Math.sin(t * 9 + d.x) * 0.08), (d.h / size.h) * inv);
-        s.alpha = 0.75 + Math.sin(t * 5) * 0.2;
+        s.scale.set(inv * (1 + Math.sin(t * 9 + d.x) * 0.08) * (1 - d.prog * 0.9), (d.h / size.h) * inv);
+        s.alpha = (0.75 + Math.sin(t * 5) * 0.2) * (1 - d.prog);
         s.tint = 0xffffff;
-        lights.add(d.x, d.y - 60, 70, LIGHT.danger, 0.35);
+        lights.add(d.x, d.y - 60, 70, training ? LIGHT.lantern : LIGHT.danger, 0.35);
         continue;
       }
       const grow = d.kind === 'bloom' && !d.open ? 1 + d.prog * 0.12 : 1;

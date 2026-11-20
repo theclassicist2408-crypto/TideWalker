@@ -1,4 +1,4 @@
-import type { AbilityId, Difficulty, RelicId, RewardId, StyleId, SwordId } from './types';
+import type { AbilityId, Difficulty, DrillId, RelicId, RewardId, StyleId, SwordId } from './types';
 
 /** Width of the virtual viewport in world units. Height follows the screen aspect ratio. */
 /** World width that fits a portrait phone screen: smaller means a closer camera. */
@@ -179,6 +179,28 @@ export const LOOT = {
   bossDiamonds: 2,
   minibossDiamonds: 1,
 };
+
+/** Training drills, in the order the tutorial teaches them, with their checklist names. */
+export const DRILLS: { id: DrillId; name: string }[] = [
+  { id: 'jump', name: 'Jump' },
+  { id: 'double', name: 'Double jump' },
+  { id: 'wall', name: 'Wall jump' },
+  { id: 'dash', name: 'Dash' },
+  { id: 'airdash', name: 'Air dash' },
+  { id: 'glide', name: 'Glide' },
+  { id: 'swim', name: 'Swim' },
+  { id: 'dive', name: 'Dive' },
+  { id: 'strike', name: 'Strike' },
+  { id: 'upstrike', name: 'Up-strike' },
+  { id: 'combo', name: 'Three-hit combo' },
+  { id: 'downstrike', name: 'Down-strike' },
+  { id: 'charge', name: 'Charged strike' },
+  { id: 'glow', name: 'Glow' },
+  { id: 'pulse', name: 'Pulse' },
+  { id: 'heal', name: 'Mend' },
+];
+/** How many times each training move must be done. */
+export const DRILL_REPS = 2;
 
 /** Fails at one checkpoint before the game quietly helps. */
 export const ASSIST_AFTER_FAILS = 3;

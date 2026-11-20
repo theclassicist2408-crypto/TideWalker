@@ -193,24 +193,50 @@ export class CreatureView {
     this.inner.rotation = (lean + swimTilt) * f;
     this.inner.scale.set(this.sx * f * flip * HERO_SCALE, this.sy * HERO_SCALE);
 
-    // Legs: a two-step cycle when running, tucked in the air, braced while healing.
+    // Legs: a long two-step stride when running (feet lift and swing, toes tilt), tucked on
+    // the way up, reaching down on the way down, braced against a wall, kneeling to heal.
+    const fa = this.footA;
+    const fb = this.footB;
     if (running) {
-      const s = Math.sin(this.stride);
-      const c = Math.cos(this.stride);
-      this.footA.position.set(1.5 + s * 4.5, 8 - Math.max(0, c) * 2.6);
-      this.footB.position.set(-1.5 - s * 4.5, 8 - Math.max(0, -c) * 2.6);
-    } else if (!grounded) {
-      const tuck = p.vy < 0 ? 3 : 1;
-      this.footA.position.set(2.5, 8 - tuck);
-      this.footB.position.set(-2.5, 7 - tuck);
+      const sn = Math.sin(this.stride);
+      const cs = Math.cos(this.stride);
+      const reach = 5.5;
+      fa.position.set(1 + sn * reach, 8 - Math.max(0, cs) * 3.6);
+      fb.position.set(-1 - sn * reach, 8 - Math.max(0, -cs) * 3.6);
+      fa.rotation = -sn * 0.45;
+      fb.rotation = sn * 0.45;
+    } else if (p.sliding) {
+      fa.position.set(5, 3);
+      fb.position.set(4, 8);
+      fa.rotation = fb.rotation = -1.2;
+    } else if (!grounded && !p.swim) {
+      const rising = p.vy < -60;
+      const k = clamp(p.vy / 600, -1, 1);
+      fa.position.set(rising ? 3 : 2, rising ? 4 : 8 + k * 1.5);
+      fb.position.set(rising ? -2 : -3, rising ? 6 : 7 + k * 1.5);
+      fa.rotation = rising ? -0.5 : 0.25;
+      fb.rotation = rising ? 0.5 : -0.25;
+    } else if (p.swim) {
+      const kick = Math.sin(this.time * 9) * 3;
+      fa.position.set(-5 + kick * 0.3, 5 + kick);
+      fb.position.set(-6 - kick * 0.3, 6 - kick);
+      fa.rotation = fb.rotation = 0;
     } else {
-      this.footA.position.set(3, 8);
-      this.footB.position.set(-2.5, 8);
+      fa.position.set(3, 8 + crouch * 0.5);
+      fb.position.set(crouch > 0 ? -5 : -2.5, 8);
+      fa.rotation = 0;
+      fb.rotation = crouch > 0 ? 0.8 : 0;
     }
-    this.footA.rotation = this.footB.rotation = 0;
-    this.cloak.position.set(0, -1 + breath * 0.5 + crouch * 2);
-    this.cloak.rotation = -clamp(p.vy / 1600, -0.1, 0.15);
-    this.helm.position.set(1, -12 + breath + crouch * 3);
+    // Cloak: streams back with speed, lifts when falling, spreads wide in a glide.
+    const stream = clamp(Math.abs(p.vx) / 500, 0, 0.35);
+    const lift = !grounded && p.vy > 80 ? clamp(p.vy / 900, 0, 0.25) : 0;
+    this.cloak.position.set(-stream * 3, -1 + breath * 0.5 + crouch * 2 - lift * 4);
+    this.cloak.rotation = -clamp(p.vy / 1600, -0.1, 0.15) - stream * 0.5 + (running ? Math.sin(this.stride * 2) * 0.04 : 0);
+    this.cloak.scale.set(inv * (p.gliding ? 1.5 : 1 + stream * 0.3), inv * (p.gliding ? 0.8 : 1 - lift * 0.3));
+    // Helm: looks where it is going; glances about when standing still.
+    const look = grounded && !running && p.healT <= 0 ? Math.sin(this.time * 0.7) * Math.max(0, Math.sin(this.time * 0.23)) * 0.12 : 0;
+    this.helm.position.set(1 + stream * 2, -12 + breath + crouch * 3);
+    this.helm.rotation = look + (running ? 0.08 : 0) + (p.vy < -200 && !grounded ? -0.1 : 0) + (p.vy > 300 ? 0.12 : 0);
 
     // Sword arm: a rest pose for every state, overridden by an active swing.
     let rest: number;

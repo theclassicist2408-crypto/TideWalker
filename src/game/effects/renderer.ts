@@ -322,6 +322,11 @@ export class GameRenderer {
         cam.shake(0.15);
         break;
       }
+      case 'drill':
+        // A training move counted: a small warm ring and a rising spark.
+        sp.spawn({ frame: 'ring', x, y, ttl: 0.45, s0: 8, s1: 60, alpha: 0.8, tint: LIGHT.lantern });
+        sp.spawn({ frame: 'spark', x, y: y - 12, vy: -60, ttl: 0.6, s0: 12, s1: 4, alpha: 1, tint: LIGHT.lantern, spin: 4 });
+        break;
       case 'finisher':
         sp.spawn({ frame: 'ring', x: x + v * 26, y, ttl: 0.3, s0: 10, s1: 90, alpha: 0.9, tint: LIGHT.creatureWarm });
         cam.shake(0.1);
@@ -549,8 +554,18 @@ export class GameRenderer {
         if (p.glow > 0.3 && speed > 30) {
           this.sparks.spawn({ x: this.creature.x - p.facing * 8 + (rnd() - 0.5) * 6, y: this.creature.y + (rnd() - 0.5) * 8, vx: -p.vx * 0.1, vy: -6 - rnd() * 14, ttl: 0.7, s0: 5 + rnd() * 3, s1: 1, alpha: 0.6 * p.glow, tint: LIGHT.creatureWarm });
         }
+        if (p.sliding && rnd() < 0.5) {
+          // Grit scraping off the wall as the hero slides down it.
+          this.motes.spawn({ x: this.creature.x + p.wallDir * 9, y: this.creature.y + 6, vx: -p.wallDir * 30, vy: -20 - rnd() * 30, gravity: 300, ttl: 0.4, s0: 3, s1: 1, alpha: 0.6, tint: this.pal.rim });
+        }
+        if (p.onGround && Math.abs(p.vx) > 180 && rnd() < 0.25) {
+          // Running kicks up a little dust.
+          this.motes.spawn({ x: this.creature.x - p.facing * 6, y: this.creature.y + 9, vx: -p.facing * 40, vy: -15 - rnd() * 20, gravity: 120, ttl: 0.45, s0: 3, s1: 6, alpha: 0.35, tint: this.pal.rim });
+        }
         if (p.dashT > 0) {
-          this.sparks.spawn({ frame: 'body', x: this.creature.x, y: this.creature.y, ttl: 0.22, s0: 30, s1: 24, alpha: 0.35, tint: LIGHT.creatureWarm });
+          // Afterimages: the hero's own silhouette, left behind in light.
+          this.sparks.spawn({ frame: 'heroCloak', x: this.creature.x, y: this.creature.y - 1, ttl: 0.24, s0: 30, s1: 28, alpha: 0.45, tint: LIGHT.safeCurrent });
+          this.sparks.spawn({ frame: 'heroHelm', x: this.creature.x + p.facing * 1.5, y: this.creature.y - 14, ttl: 0.24, s0: 24, s1: 22, alpha: 0.4, tint: LIGHT.safeCurrent });
         } else if (speed > 240) {
           this.sparks.spawn({ frame: 'streak', x: this.creature.x, y: this.creature.y, ttl: 0.25, s0: 5, s1: 5, alpha: 0.4, tint: 0xffffff, rotation: Math.atan2(p.vy, p.vx) + Math.PI / 2 });
         }

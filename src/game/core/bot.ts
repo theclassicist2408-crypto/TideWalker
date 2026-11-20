@@ -1,7 +1,7 @@
 import { ENEMY } from '../entities/enemies';
-import { FIXED_DT, P } from './constants';
-import { newIntent, type Intent, type Waypoint } from './types';
-import type { EnemyState, World } from './world';
+import { DRILL_REPS, FIXED_DT, P } from './constants';
+import { newIntent, type DrillId, type Intent, type Waypoint } from './types';
+import type { EnemyState, GateState, World } from './world';
 
 /**
  * A plain but competent player used to prove levels can be crossed and guardians beaten.
@@ -30,6 +30,8 @@ export class Bot {
   private jumpWait = 0;
   private lastWall = 0;
   private focus: EnemyState | null = null;
+  private drillNow: DrillId | null = null;
+  private drillT = 0;
 
   constructor(
     private readonly w: World,
@@ -167,7 +169,9 @@ export class Bot {
 
     // --- Fight or travel -------------------------------------------------------------------
     const foe = this.pickFoe(t);
+    const gate = foe ? null : this.drillGate();
     if (foe) this.fight(foe, out);
+    else if (gate) this.drill(gate, out, dt);
     else if (t) this.travel(t, out, dt);
     else out.mx = 1;
 
@@ -176,6 +180,114 @@ export class Bot {
     if (out.jump) out.jumpHeld = true;
     this.mend(out, foe !== null);
     return this.unstick(out, dt);
+  }
+
+  /** A closed training gate just ahead, if any. */
+  private drillGate(): GateState | null {
+    const p = this.w.player;
+    for (const g of this.w.gates) {
+      if (g.kind !== 'drill' || g.open || g.x < p.x - 10 || g.x - p.x > 170 || Math.abs(g.y - p.y) > 220) continue;
+      return g;
+    }
+    return null;
+  }
+
+  /** Practises whatever the gate still asks for, the way a player would. */
+  private drill(g: GateState, out: Intent, dt: number): void {
+    const w = this.w;
+    const p = w.player;
+    let want: DrillId | null = null;
+    for (const d of g.drills ?? []) {
+      if (w.drills[d] < DRILL_REPS) {
+        want = d;
+        break;
+      }
+    }
+    if (!want) return;
+    if (want !== this.drillNow) {
+      this.drillNow = want;
+      this.drillT = 0;
+    }
+    this.drillT += dt;
+    const k = this.drillT;
+    const toward = g.x > p.x ? 1 : -1;
+    // Keep a little room in front of the gate to move in.
+    const room = Math.abs(g.x - p.x) < 40 ? -toward : 0;
+    switch (want) {
+      case 'jump':
+        out.jump = p.onGround;
+        break;
+      case 'double':
+        out.jump = p.onGround || (p.vy > 0 && p.jumpsLeft > 0);
+        out.jumpHeld = true;
+        break;
+      case 'wall':
+        out.mx = toward;
+        out.jumpHeld = true;
+        out.jump = p.onGround || (p.wallT > 0 && p.vy > -100);
+        break;
+      case 'dash':
+        out.mx = room || toward;
+        out.dash = p.onGround && p.dashCd <= 0;
+        break;
+      case 'airdash':
+        out.mx = room || -toward;
+        out.jump = p.onGround;
+        out.jumpHeld = true;
+        out.dash = !p.onGround && !p.airDashed && p.dashCd <= 0 && p.vy > -300;
+        break;
+      case 'glide':
+        out.mx = room;
+        out.jumpHeld = true;
+        out.jump = p.onGround || (p.vy > 0 && p.jumpsLeft > 0);
+        break;
+      case 'swim':
+      case 'dive':
+        // The water is behind us: go back in, dive under, climb out, and in again.
+        if (!p.swim) out.mx = -1;
+        else if (want === 'dive') {
+          out.my = 1;
+          out.mx = -0.3;
+        } else {
+          out.mx = 1;
+          out.my = -1;
+          out.jump = p.y <= w.waterAt(p.x) + 5;
+        }
+        break;
+      case 'strike':
+        out.mx = room;
+        out.attack = true;
+        break;
+      case 'upstrike':
+        out.my = -1;
+        out.attack = true;
+        break;
+      case 'combo':
+        out.mx = room;
+        out.attack = p.onGround;
+        break;
+      case 'downstrike':
+        out.jump = p.onGround;
+        out.jumpHeld = true;
+        out.my = p.onGround ? 0 : 1;
+        out.attack = !p.onGround;
+        break;
+      case 'charge':
+        out.mx = room;
+        out.attackHeld = k % 1 < 0.72;
+        break;
+      case 'glow':
+        out.glow = k % 0.8 < 0.4;
+        break;
+      case 'pulse':
+        out.pulse = p.pulseCd <= 0 && p.lumen >= P.pulseCost;
+        break;
+      case 'heal':
+        // Healed already: walk back to where the old wound aches.
+        if (p.hp >= w.load.hpMax) out.mx = -1;
+        else out.heal = true;
+        break;
+    }
   }
 
   private advance(c: Waypoint): void {

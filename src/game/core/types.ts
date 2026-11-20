@@ -49,7 +49,9 @@ export type HintKind =
   | 'rematch'
   | 'ability'
   | 'chest'
-  | 'trial';
+  | 'trial'
+  | 'upstrike'
+  | 'combo';
 
 export interface PlatformDef {
   x: number;
@@ -134,8 +136,12 @@ export interface GeyserDef extends PointDef {
 
 export interface GateDef extends PointDef {
   h: number;
-  /** bloom: opens when lit. tide: follows the water. arena: closed while its arena is fought. */
-  kind: 'bloom' | 'tide' | 'arena';
+  /**
+   * bloom: opens when lit. tide: follows the water. arena: closed while its arena is fought.
+   * drill: a training gate that opens once each of its moves has been done twice.
+   */
+  kind: 'bloom' | 'tide' | 'arena' | 'drill';
+  drills?: DrillId[];
   openAbove?: number;
   openBelow?: number;
   arena?: number;
@@ -344,6 +350,9 @@ export const newIntent = (): Intent => ({
   item: false,
 });
 
+/** Moves the training grounds ask for, each twice, before the way on opens. */
+export type DrillId = 'jump' | 'double' | 'wall' | 'dash' | 'airdash' | 'glide' | 'swim' | 'dive' | 'strike' | 'upstrike' | 'downstrike' | 'combo' | 'charge' | 'glow' | 'pulse' | 'heal';
+
 export type SwordId = 'tide' | 'ember' | 'storm' | 'coral' | 'void' | 'crown';
 /** Fighting techniques bought at the Forge. */
 export type StyleId = 'combo' | 'rising' | 'dashcut' | 'plunge';
@@ -467,7 +476,8 @@ export type EventType =
   | 'art'
   | 'finisher'
   | 'trialEnter'
-  | 'trialExit';
+  | 'trialExit'
+  | 'drill';
 
 export interface GameEvent {
   type: EventType;

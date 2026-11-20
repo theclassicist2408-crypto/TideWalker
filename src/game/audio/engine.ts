@@ -594,6 +594,9 @@ export class AudioEngine {
         this.burst({ dur: 0.35, freq: 2600, to: 500, gain: 0.18, wet: 0.5, pan });
         this.tone({ freq: this.scaleHz(0, 2), to: this.scaleHz(7, 2), dur: 0.3, gain: 0.1, wet: 0.5 });
         break;
+      case 'drill':
+        this.bell(this.scaleHz(4, 3), 0, 0.07, this.sfxBus);
+        break;
       case 'finisher':
         this.tone({ freq: 660, to: 330, dur: 0.12, gain: 0.1, type: 'triangle', pan });
         break;

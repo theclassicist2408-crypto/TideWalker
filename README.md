@@ -18,8 +18,11 @@ repository contains no binary art or audio and nothing borrowed.
 - **The Shallows — Tutorial.** Before the fall the Tideborn has everything: run, jump, double jump,
   wall-cling and wall-jump, dash and air dash, swim and dive, glide, strike in three directions,
   pogo off hazards with a downward strike, charge a Lumen Strike, fire a Lumen Pulse, heal with Tide
-  Essence. The tutorial teaches each, then lantern checkpoints, pausing, a guardian's health bar and
-  rematches, and ends with a sparring fight against the Echo of the Deep. Then the fall takes it all.
+  Essence. The tutorial is a training ground: after each lesson a golden gate waits until that move
+  has been done **twice** (a checklist in the HUD shows what is left — sixteen moves in all, from
+  jump to the three-hit combo), so every player has tried everything before the game begins. Then
+  lanterns, pausing, a guardian's health bar and rematches, a sparring fight against the Echo of
+  the Deep — and the fall takes it all.
 - **Ten areas × ten levels.** The Shallows, Moonlit Pools, Kelp Abyss, Drowned Ruins, Storm Reach,
   Coral Cathedral, Sunken Forge, Abyssal Gardens, The Silent Deep, and the Tide King's Throne. Each
   area has its own rule (moonglass that only light reveals, underwater combat, wind, heat, darkness
@@ -30,9 +33,13 @@ repository contains no binary art or audio and nothing borrowed.
   Ember Fang, Bloom Burst, Void Current, Tide Crown — a Lumen-powered ability you equip and swap.
 - **Twenty minibosses**, two per area. Four guard a lost ability; the rest are optional and pay out
   upgrades: extra masks, more Lumen, more Essence vials, a wider Pulse.
-- **Fourteen enemy kinds** with distinct answers: shellbacks block from the front, thornblooms are
-  armoured until they open, burrowers surface under you, sentinels duel at range, broodmothers
-  spawn mites, voidlings blink.
+- **Fourteen sea creatures** with distinct answers, each animated part by part: crab grunts snap
+  their claws, pufferfish inflate to spit, manta rays swoop, sand eels burst from the floor,
+  anglerfish gape behind a lure, hermit-crab knights guard with a raised claw, octopus mothers
+  call their brood, jellyfish discharge, magma lobsters slam, anemones open to fire, ghost squid
+  blink and swordfish knights duel with a spear.
+- **A sword combo.** Strike three times quickly: a cut, a back-cut, then a heavy finisher with a
+  step forward. Mash the button and the presses queue up.
 - **Swords you can see.** The Tideborn carries its sword in hand; every swing is a real arc with
   a trail of light, and struck foes squash, spark and throw up damage numbers.
 - **Plasma, diamonds and the Forge.** Every foe drops plasma (banked at lanterns, lost on a fall);
@@ -59,16 +66,16 @@ repository contains no binary art or audio and nothing borrowed.
 
 | Action | Touch pad | Keyboard |
 | --- | --- | --- |
-| Move, aim up/down | Floating stick (left thumb) | ← → ↑ ↓ or WASD |
-| Jump (hold for height), wall-jump, double jump; hold while falling to glide | Jump | Space / Z |
-| Strike (with ↑ / ↓ in the air for up / down strikes) | Strike | X / J |
-| Lumen Strike | Hold Strike, release | Hold X |
-| Dash / air dash | Dash | C / K / Shift |
-| Lumen Pulse (tap) · Glow (hold) | Light | V / L / E |
-| Mend | Hold Mend | H / R |
-| Use gift · switch gift | Gift · tap the gift badge | F · Q |
-| Use relic · switch relic | Tap the relic badge | G · T |
-| Enter a trial arch | Push the stick up | ↑ |
+| Move, aim up/down | Floating stick (left thumb) | WASD (or arrows) |
+| Jump (hold for height), wall-jump, double jump; hold while falling to glide | Jump | Space |
+| Strike (with W / S for up / down strikes; three quickly for a combo) | Strike | X or left click |
+| Lumen Strike (your sword's art) | Hold Strike, release | Hold X or left button |
+| Dash / air dash | Dash | Shift |
+| Lumen Pulse (tap) · Glow (hold) | Light | E or right click |
+| Mend | Hold Mend | Hold Q |
+| Use gift · switch gift | Gift · tap the gift badge | F · 1 |
+| Use relic · switch relic | Tap the relic badge | R · 2 |
+| Enter a trial arch | Push the stick up | W |
 | Pause | Pause button | Esc / P |
 
 Gamepads (standard layout): left stick or d-pad to move, A jump, X strike (hold for the art),
@@ -103,9 +110,9 @@ Details, signing and store notes: [docs/PACKAGING.md](docs/PACKAGING.md).
 ```bash
 npm run typecheck    # TypeScript strict mode
 npm run lint         # ESLint
-npm test             # 176 unit and integration tests, including bot playthroughs of every level
+npm test             # 182 unit and integration tests, including bot playthroughs of every level
 npx playwright install chromium   # once
-npm run test:e2e     # 47 end-to-end tests: real touch input, portrait and landscape phones to desktop, offline
+npm run test:e2e     # 49 end-to-end tests: real touch input, portrait and landscape phones to desktop, offline
 npm run check        # typecheck + lint + unit tests + production build
 npm run verify:levels   # table of the bot's run through every level on every difficulty
 ```

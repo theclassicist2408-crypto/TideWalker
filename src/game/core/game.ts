@@ -12,7 +12,7 @@ import { ROMAN } from '../ui/dom';
 import { Hud } from '../ui/hud';
 import { Ui, type AreaView, type CompleteInfo, type Earned, type UiHost } from '../ui/screens';
 import { Bot } from './bot';
-import { ALL_RELICS, FIXED_DT, LEVELS_PER_AREA, RELICS, REWARDS } from './constants';
+import { ALL_RELICS, DRILL_REPS, DRILLS, FIXED_DT, LEVELS_PER_AREA, RELICS, REWARDS } from './constants';
 import { FixedLoop } from './loop';
 import { ABILITY_NAMES, UPGRADE_NAMES } from './names';
 import { newIntent, type GameEvent, type GameMode, type HintKind, type LevelData } from './types';
@@ -59,6 +59,7 @@ export class Game implements UiHost {
   private hintKind: HintKind | null = null;
   private hintT = 0;
   private hintsSeen = new Set<HintKind>();
+  private readonly drillItems: { name: string; n: number; need: number }[] = [];
   private clock = 0;
   private readonly fade: HTMLElement;
   /** Verification bot; when set it plays instead of the player (automated playtests). */
@@ -300,6 +301,22 @@ export class Game implements UiHost {
     this.audio.ui('toggle');
   }
 
+  /** The training checklist: the moves the next golden gate is waiting for. */
+  private updateDrills(): void {
+    const w = this.world;
+    if (this.session.mode !== 'tutorial') {
+      this.hud.setDrills(0, 0, null);
+      return;
+    }
+    let done = 0;
+    for (const d of DRILLS) if (w.drills[d.id] >= DRILL_REPS) done++;
+    let next: (typeof w.gates)[number] | null = null;
+    for (const g of w.gates) if (g.kind === 'drill' && !g.open && g.x > w.player.x - 40 && (!next || g.x < next.x)) next = g;
+    this.drillItems.length = 0;
+    if (next?.drills) for (const id of next.drills) this.drillItems.push({ name: DRILLS.find((d) => d.id === id)?.name ?? id, n: w.drills[id], need: DRILL_REPS });
+    this.hud.setDrills(done, DRILLS.length, done >= DRILLS.length && !next ? [] : this.drillItems);
+  }
+
   /** Plasma (banked plus carried), diamonds, and the relic in hand. */
   private refreshWallet(): void {
     const w = this.world;
@@ -449,6 +466,7 @@ export class Game implements UiHost {
     this.hud.setGift(gift ? REWARDS[gift].name : null, p.abilityCd <= 0 && p.lumen >= (gift ? REWARDS[gift].cost : 0));
     this.haptics.danger(p.danger, this.clock);
     this.updateHints(dt);
+    this.updateDrills();
 
     if (drift) {
       this.hud.setDistance(this.driftDistance());
@@ -571,6 +589,9 @@ export class Game implements UiHost {
         this.audio.relief(0.6);
         break;
       }
+      case 'drill':
+        this.haptics.play('pickup');
+        break;
       case 'bank':
         // Plasma carried since the last lantern is safe now.
         this.save.addPlasma(e.v);

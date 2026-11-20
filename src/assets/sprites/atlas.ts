@@ -952,7 +952,7 @@ const painters: Record<string, { w: number; h: number; paint: Painter }> = {
   },
 };
 
-/** Dark body with a coloured rim: the shared look of everything hostile. */
+/** Dark body with a coloured rim: the shared look of the guardians. */
 function hostileFill(c: Ctx, w: number, h: number): void {
   c.fillStyle = radial(c, w * 0.45, h * 0.4, Math.max(w, h) * 0.62, [
     [0, '#4a3a6a'],
@@ -970,228 +970,6 @@ function eyeDot(c: Ctx, x: number, y: number, r = 2): void {
     [1, 'rgba(255,150,230,0)'],
   ]);
   c.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
-}
-
-/** Regular foes. Each has its own outline so it can be read at a glance. All face right. */
-const ENEMY_SHAPES: Record<string, (c: Ctx) => void> = {
-  // Low, wide crab that rushes.
-  skitter: (c) => {
-    c.beginPath();
-    c.ellipse(20, 26, 15, 9, 0, 0, TAU);
-    c.fill();
-    c.stroke();
-    for (const x of [8, 14, 26, 32]) {
-      c.beginPath();
-      c.moveTo(x, 30);
-      c.lineTo(x + (x < 20 ? -5 : 5), 38);
-      c.stroke();
-    }
-    c.beginPath();
-    c.moveTo(32, 22);
-    c.lineTo(39, 16);
-    c.lineTo(36, 25);
-    c.fill();
-    eyeDot(c, 27, 23);
-  },
-  // Rooted bulb with an upturned mouth that lobs.
-  spitter: (c) => {
-    c.beginPath();
-    c.moveTo(8, 38);
-    c.quadraticCurveTo(4, 18, 20, 14);
-    c.quadraticCurveTo(36, 18, 32, 38);
-    c.closePath();
-    c.fill();
-    c.stroke();
-    c.beginPath();
-    c.ellipse(22, 13, 8, 4, -0.3, 0, TAU);
-    c.fill();
-    c.stroke();
-    eyeDot(c, 23, 26);
-  },
-  // Swept wings.
-  gloomwing: (c) => {
-    c.beginPath();
-    c.moveTo(20, 22);
-    c.quadraticCurveTo(8, 2, 1, 14);
-    c.quadraticCurveTo(10, 16, 14, 28);
-    c.quadraticCurveTo(20, 34, 26, 28);
-    c.quadraticCurveTo(30, 16, 39, 14);
-    c.quadraticCurveTo(32, 2, 20, 22);
-    c.fill();
-    c.stroke();
-    eyeDot(c, 23, 24);
-  },
-  // Thin dart of a fish.
-  needlefish: (c) => {
-    c.beginPath();
-    c.moveTo(39, 20);
-    c.quadraticCurveTo(22, 11, 6, 17);
-    c.lineTo(1, 11);
-    c.lineTo(3, 20);
-    c.lineTo(1, 29);
-    c.lineTo(6, 23);
-    c.quadraticCurveTo(22, 29, 39, 20);
-    c.fill();
-    c.stroke();
-    eyeDot(c, 30, 19);
-  },
-  // Segmented worm rearing out of the ground.
-  burrower: (c) => {
-    for (let i = 0; i < 4; i++) {
-      c.beginPath();
-      c.ellipse(20 + Math.sin(i) * 3, 34 - i * 8, 9 - i, 6, 0, 0, TAU);
-      c.fill();
-      c.stroke();
-    }
-    c.beginPath();
-    c.moveTo(14, 8);
-    c.lineTo(20, 0);
-    c.lineTo(26, 8);
-    c.fill();
-    eyeDot(c, 22, 12);
-  },
-  // A lantern on a stalk with a body crouched beneath.
-  lurker: (c) => {
-    c.beginPath();
-    c.ellipse(20, 30, 14, 8, 0, Math.PI, 0);
-    c.lineTo(34, 38);
-    c.lineTo(6, 38);
-    c.closePath();
-    c.fill();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(20, 22);
-    c.quadraticCurveTo(26, 12, 22, 6);
-    c.stroke();
-    c.fillStyle = radial(c, 22, 6, 6, [
-      [0, '#fff6dc'],
-      [1, 'rgba(255,217,138,0)'],
-    ]);
-    c.fillRect(16, 0, 12, 12);
-  },
-  // A shell with a flat shield face on the right.
-  shellback: (c) => {
-    c.beginPath();
-    c.moveTo(6, 36);
-    c.quadraticCurveTo(4, 12, 22, 10);
-    c.lineTo(30, 14);
-    c.lineTo(30, 36);
-    c.closePath();
-    c.fill();
-    c.stroke();
-    c.fillStyle = '#8f86bd';
-    c.beginPath();
-    c.roundRect(30, 8, 7, 30, 3);
-    c.fill();
-    c.stroke();
-    eyeDot(c, 24, 20);
-  },
-  // Swollen brood sac.
-  broodmother: (c) => {
-    c.beginPath();
-    c.ellipse(20, 24, 17, 14, 0, 0, TAU);
-    c.fill();
-    c.stroke();
-    c.fillStyle = 'rgba(220,150,230,0.35)';
-    for (const [x, y] of [[13, 20], [22, 28], [27, 18], [16, 30]]) {
-      c.beginPath();
-      c.arc(x, y, 3.2, 0, TAU);
-      c.fill();
-    }
-    eyeDot(c, 20, 12, 2.4);
-  },
-  mite: (c) => {
-    c.beginPath();
-    c.ellipse(20, 26, 8, 6, 0, 0, TAU);
-    c.fill();
-    c.stroke();
-    eyeDot(c, 24, 24, 1.6);
-  },
-  // Bell with trailing threads.
-  stormjelly: (c) => {
-    c.beginPath();
-    c.moveTo(6, 22);
-    c.quadraticCurveTo(20, -6, 34, 22);
-    c.quadraticCurveTo(20, 28, 6, 22);
-    c.fill();
-    c.stroke();
-    for (const x of [11, 17, 23, 29]) {
-      c.beginPath();
-      c.moveTo(x, 24);
-      c.quadraticCurveTo(x + 3, 31, x - 1, 39);
-      c.stroke();
-    }
-    eyeDot(c, 20, 14, 2.4);
-  },
-  // Heavy, square, with a glowing chest.
-  emberhusk: (c) => {
-    c.beginPath();
-    c.roundRect(5, 6, 30, 32, 6);
-    c.fill();
-    c.stroke();
-    c.fillStyle = radial(c, 20, 24, 9, [
-      [0, '#ffe0a0'],
-      [1, 'rgba(255,120,40,0)'],
-    ]);
-    c.fillRect(11, 15, 18, 18);
-    eyeDot(c, 26, 13);
-  },
-  // Closed bud with thorns.
-  thornbloom: (c) => {
-    c.beginPath();
-    c.moveTo(20, 4);
-    c.quadraticCurveTo(36, 18, 28, 38);
-    c.lineTo(12, 38);
-    c.quadraticCurveTo(4, 18, 20, 4);
-    c.fill();
-    c.stroke();
-    for (const [x, y, d] of [[8, 20, -1], [32, 20, 1], [10, 30, -1], [30, 30, 1]]) {
-      c.beginPath();
-      c.moveTo(x, y);
-      c.lineTo(x + d * 6, y - 3);
-      c.stroke();
-    }
-    eyeDot(c, 20, 22);
-  },
-  // A tall thin wisp: mostly absence.
-  voidling: (c) => {
-    c.beginPath();
-    c.moveTo(20, 2);
-    c.bezierCurveTo(32, 10, 30, 28, 24, 38);
-    c.lineTo(16, 38);
-    c.bezierCurveTo(10, 28, 8, 10, 20, 2);
-    c.fill();
-    c.stroke();
-    eyeDot(c, 17, 14, 1.8);
-    eyeDot(c, 24, 14, 1.8);
-  },
-  // Armoured figure with a spear.
-  sentinel: (c) => {
-    c.beginPath();
-    c.moveTo(12, 38);
-    c.lineTo(10, 16);
-    c.quadraticCurveTo(20, 2, 28, 16);
-    c.lineTo(28, 38);
-    c.closePath();
-    c.fill();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(30, 36);
-    c.lineTo(38, 4);
-    c.stroke();
-    eyeDot(c, 23, 16);
-  },
-};
-
-for (const name of Object.keys(ENEMY_SHAPES)) {
-  painters[`e_${name}`] = {
-    w: 40,
-    h: 40,
-    paint: (c, w, h) => {
-      hostileFill(c, w, h);
-      ENEMY_SHAPES[name](c);
-    },
-  };
 }
 
 /** Guardians: fourteen large bodies (ten bosses, four shared by the lesser guardians). */
@@ -1525,6 +1303,30 @@ Object.assign(painters, {
         c.moveTo(w / 2 - 7, y);
         c.lineTo(w / 2, y + 6);
         c.lineTo(w / 2 + 7, y);
+        c.stroke();
+      }
+    },
+  },  /** Training ward: the same curtain in warm gold, with rising chevrons (a lesson, not a threat). */
+  trainWard: {
+    w: 26,
+    h: 128,
+    paint: (c: Ctx, w: number, h: number) => {
+      c.fillStyle = linear(c, 0, 0, w, 0, [
+        [0, 'rgba(255,200,110,0)'],
+        [0.5, 'rgba(255,217,138,0.6)'],
+        [1, 'rgba(255,200,110,0)'],
+      ]);
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = 'rgba(255,246,220,0.95)';
+      c.fillRect(w / 2 - 1, 0, 2, h);
+      c.strokeStyle = 'rgba(255,230,170,0.9)';
+      c.lineWidth = 1.6;
+      c.lineJoin = 'round';
+      for (let y = 8; y < h - 4; y += 14) {
+        c.beginPath();
+        c.moveTo(w / 2 - 7, y + 6);
+        c.lineTo(w / 2, y);
+        c.lineTo(w / 2 + 7, y + 6);
         c.stroke();
       }
     },

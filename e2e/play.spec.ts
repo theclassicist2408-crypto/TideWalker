@@ -11,6 +11,9 @@ test.describe('playing with the touch pad', () => {
     for (const b of ['jump', 'attack', 'dash', 'light', 'heal']) await expect(page.locator(`.pad-btn[data-btn="${b}"]`)).toBeVisible();
     await expect(page.locator('.hud-masks .mask.full').first()).toBeVisible();
     await expect(page.locator('.hud-hint.on')).toBeVisible();
+    // The training checklist names the moves the first golden gate is waiting for.
+    await expect(page.locator('.hud-drills.on')).toContainText('Training');
+    await expect(page.locator('.hud-drills.on')).toContainText('Jump');
   });
 
   test('the stick runs, Jump leaps and Strike swings — with real touches', async ({ page, game }) => {

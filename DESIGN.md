@@ -38,20 +38,25 @@ power or gift → use it to go deeper.
 
 | Kind | Behaviour | Answer |
 | --- | --- | --- |
-| Skitter | Patrols, lunges | Jump the lunge, strike the recovery |
-| Spitter | Lobs arcing shots | Cut shots from the air, close in |
-| Gloomwing | Swoops in a line | Step aside, strike as it climbs |
-| Needlefish | Darts through water | Slip off its line |
-| Burrower | Hides, erupts under you | Step off the warning ring, strike while it is up |
-| Lurker | Ambush from cover | Bait it, punish the miss |
-| Shellback | Blocks from the front | Strike from behind, from above, or charged |
-| Broodmother | Spawns mites | Kill her first |
-| Mite | Fast, fragile swarmer | One hit each |
-| Stormjelly | Drifts, discharges a ring | Wait out the ring |
-| Emberhusk | Heavy, slow, slams | Keep moving, strike after the slam |
-| Thornbloom | Armoured until it opens to fire | Strike while open, or charged |
-| Voidling | Blinks and fires | Strike as it reappears |
-| Sentinel | Duels at range: shots and charges | Close in after its attack |
+| Kind (code) | Sea creature | Behaviour and tell | Answer |
+| --- | --- | --- | --- |
+| skitter | Crab grunt | Patrols; raises its claw, then lunges | Jump the lunge, strike the recovery |
+| spitter | Pufferfish | Inflates, spines up, then lobs a shot | Cut shots from the air, close in |
+| gloomwing | Manta ray | Wings raised high, then a swooping dive | Step aside, strike as it climbs |
+| needlefish | Needlefish | Draws back like a bowstring, then darts | Slip off its line |
+| burrower | Sand eel | A mound with eyes; rises shaking, then erupts | Step off the ring, strike while it is up |
+| lurker | Anglerfish | A swaying lure; the jaw gapes, then snaps | Bait it, punish the miss |
+| shellback | Hermit-crab knight | Claw raised as a shield | Strike from behind, from above, or charged |
+| broodmother | Octopus mother | Tentacles flare as she calls her brood | Kill her first |
+| mite | Shrimp crab | Fast, fragile swarmer | One hit each |
+| stormjelly | Jellyfish | Bell brightens, tentacles spread, then a ring | Wait out the ring |
+| emberhusk | Magma lobster | Both claws raised high, then a slam | Keep moving, strike after the slam |
+| thornbloom | Anemone | Petals folded shut (armoured); opens to fire | Strike while open, or charged |
+| voidling | Ghost squid | Squeezes, blinks and fires | Strike as it reappears |
+| sentinel | Swordfish knight | Spear drawn back, then thrust or a shot | Close in after its attack |
+
+Every creature is a rig of shared atlas parts (`src/game/effects/foeRig.ts`): legs step with the
+distance travelled, and every wind-up is shown by pose, shake and a red-violet glow.
 
 Elites are drawn larger and paler-pink, and have half again the health. Enemy health scales gently with
 the area.

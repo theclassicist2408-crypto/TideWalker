@@ -129,6 +129,9 @@ export function updateProps(w: World, dt: number): void {
     const g = w.gates[i];
     if (g.kind === 'arena') {
       g.prog = approach(g.prog, g.open ? 1 : 0, dt * 5);
+    } else if (g.kind === 'drill') {
+      // Opened by the world when its moves are done; here it only slides aside.
+      g.prog = approach(g.prog, g.open ? 1 : 0, dt * 3);
     } else if (g.kind === 'tide') {
       const open = (g.openAbove !== undefined && w.waterY <= g.openAbove) || (g.openBelow !== undefined && w.waterY >= g.openBelow);
       if (open !== g.open) {

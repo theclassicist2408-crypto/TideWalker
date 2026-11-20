@@ -4,8 +4,9 @@ import { bench, glassBridge, shaft } from './motifs';
 
 /**
  * The Shallows — Tutorial. The Tideborn at full strength, before the Tide King takes its light.
- * Every skill is met alone and safely, in the order a hand learns them, and the level ends with
- * one small fight that uses them together.
+ * Every skill is met alone and safely, in the order a hand learns them. After each lesson a
+ * golden training gate waits until that move has been done twice, so by the end the player has
+ * tried everything the game offers. It ends with one small fight that uses them together.
  */
 export function tutorialLevel(): LevelData {
   const b = new LevelBuilder({
@@ -24,25 +25,26 @@ export function tutorialLevel(): LevelData {
   b.flat(300).hint('move', 290, 260);
   b.hills(240, 10, 2);
   b.flat(140).hint('jump', 130, 240);
-  b.step(-50).flat(120).pit(84, 150).flat(140);
+  b.step(-50).flat(120).pit(84, 150).flat(140).drillGate(['jump'], 40);
   // Double jump: a ledge one leap cannot reach.
   b.flat(120).hint('double', 110, 260);
-  b.step(-120, 'double').flat(160);
+  b.step(-120, 'double').flat(160).drillGate(['double'], 50);
   // Wall cling and wall jump: a chimney.
   b.hint('wall', 0, 320);
   shaft(b, 210);
+  b.flat(40).drillGate(['wall'], 20);
   bench(b, 200);
   b.hint('bench', 150, 150);
 
   // Dash and air-dash.
   b.slope(260, 150);
   b.flat(140).hint('dash', 130, 260);
-  b.pit(150, 150, { act: 'dash' }).flat(160);
+  b.pit(150, 150, { act: 'dash' }).flat(160).drillGate(['dash'], 50);
   b.hint('airdash', 0, 360);
-  b.pit(250, 150, { act: 'double' }).flat(160);
+  b.pit(250, 150, { act: 'double' }).flat(160).drillGate(['airdash'], 50);
   // Glide: a long way across, from high up.
   b.step(-120, 'double').flat(140).hint('glide', 130, 420);
-  b.pit(330, 260, { act: 'glide', farDy: 110 }).flat(160);
+  b.pit(330, 260, { act: 'glide', farDy: 110 }).flat(160).drillGate(['glide'], 50);
 
   // Water: swim, then dive under a sunken wall. The pool is the lowest ground in the level.
   b.step(140).flat(130).step(140).flat(120);
@@ -53,25 +55,34 @@ export function tutorialLevel(): LevelData {
   });
   b.hint('dive', 400, 240);
   b.fireflies(120, -20, 3, 24);
+  b.flat(70).drillGate(['swim', 'dive'], 30);
   bench(b, 200);
 
   // The blade.
   b.flat(260).hint('attack', 250, 260);
   b.foe('skitter', 60, 70);
+  b.flat(160).hint('upstrike', 150, 160);
+  b.flat(160).hint('combo', 150, 160);
+  b.flat(40).drillGate(['strike', 'upstrike', 'combo'], 20);
   b.flat(200).hint('downstrike', 190, 260);
   b.urchin(110).urchin(60);
+  b.flat(90).drillGate(['downstrike'], 30);
   b.flat(200).hint('charge', 190, 260);
   b.block(40, 130, 30, 130, 'cracked');
+  b.flat(90).drillGate(['charge'], 30);
   // Light: glow shows the way, pulse opens it — and both are seen.
   b.flat(140).hint('glow', 130, 320);
   glassBridge(b, 190);
+  b.flat(70).drillGate(['glow'], 30);
   b.flat(180).hint('pulse', 170, 260);
   b.bloomGate(40, 130);
+  b.flat(90).drillGate(['pulse'], 30);
   b.flat(260).hint('danger', 250, 300);
   b.foe('gloomwing', 90, 130);
   // Healing: an old wound aches here, and there is a quiet place to mend it.
   b.flat(240).hint('heal', 230, 260);
   bench(b, 200);
+  b.flat(50).drillGate(['heal'], 20);
   b.hint('pause', 190, 180);
 
   // One small fight with everything, and a guardian to show the health bar.

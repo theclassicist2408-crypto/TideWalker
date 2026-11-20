@@ -50,3 +50,21 @@ test.describe('keyboard', () => {
     await game.waitState('playing');
   });
 });
+
+test.describe('mouse', () => {
+  test('left click strikes, right button held glows', async ({ page, game }) => {
+    await game.skipTutorial();
+    await game.run((g) => g.playLevel(1, 1));
+    await game.waitState('playing');
+    await page.waitForTimeout(400);
+    const id0 = await game.run((g) => g.world.player.slashId);
+    await page.mouse.move(640, 300);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.up({ button: 'left' });
+    await expect.poll(() => game.run((g) => g.world.player.slashId)).not.toBe(id0);
+    await page.mouse.down({ button: 'right' });
+    await expect.poll(() => game.run((g) => g.world.player.glowOn)).toBe(true);
+    await page.mouse.up({ button: 'right' });
+    await expect.poll(() => game.run((g) => g.world.player.glowOn)).toBe(false);
+  });
+});

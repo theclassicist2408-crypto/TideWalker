@@ -74,6 +74,8 @@ procedural. Repository: https://github.com/theclassicist2408-crypto/TideWalker
 - Lanterns (checkpoints) no more than 2700 px apart (chases restart from the top by design).
 - Water is never an instant failure. Basins hold still water (`basin`, `pit({ swim: true })`).
 - Two Memory Shells per area, ids `aNN-1` / `aNN-2`, at least one hidden.
+- The tutorial's golden `drillGate`s must together ask for every id in `DRILLS`; the bot's `drill()`
+  must know how to perform any new one.
 - A chest on every level (added by `buildLevel`); trials on levels 2, 5, 8 unless the level is a chase,
   timed or flooded.
 

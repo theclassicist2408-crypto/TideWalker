@@ -1,4 +1,4 @@
-import type { AbilityId, ArenaDef, RelicId, BiomeId, CurrentDef, EnemyKind, HintKind, LevelData, LevelRules, PlatformDef, TideDef, UpgradeId, Waypoint, WeatherDef } from '../core/types';
+import type { AbilityId, ArenaDef, DrillId, RelicId, BiomeId, CurrentDef, EnemyKind, HintKind, LevelData, LevelRules, PlatformDef, TideDef, UpgradeId, Waypoint, WeatherDef } from '../core/types';
 import { P } from '../core/constants';
 import { OPEN_SKY } from '../systems/terrain';
 
@@ -387,6 +387,13 @@ export class LevelBuilder {
   }
 
   /** A resting light: checkpoint. */
+  /** A training gate at the cursor: it opens once each of `drills` has been done twice. */
+  drillGate(drills: DrillId[], back = 0): this {
+    const x = this.x - back;
+    this.data.gates.push({ x, y: this.groundAt(x), h: 420, kind: 'drill', drills });
+    return this;
+  }
+
   /** A chest `back` px behind the cursor (raised by `up`, else on the ground). Strike it open. */
   chest(back: number, loot: Loot, up = 0): this {
     const x = this.x - back;
