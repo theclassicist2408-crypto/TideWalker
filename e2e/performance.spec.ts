@@ -17,8 +17,9 @@ test.describe('performance and offline', () => {
     const a = await sample();
     await page.waitForTimeout(12_000);
     const b = await sample();
-    // Software rendering in CI is far slower than a phone GPU; this guards against collapse, not polish.
-    expect(b.fps).toBeGreaterThan(20);
+    // Software rendering is far slower than a phone GPU, and a two-core CI runner slower still;
+    // this guards against collapse (a leak or runaway loop), not polish.
+    expect(b.fps).toBeGreaterThan(process.env.CI ? 8 : 20);
     expect(b.nodes).toBeLessThan(a.nodes + 400);
     expect(b.dom).toBeLessThanOrEqual(a.dom + 10);
   });

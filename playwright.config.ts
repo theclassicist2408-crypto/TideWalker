@@ -11,8 +11,9 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
-  // Chromium renders WebGL in software here; a few workers keep frame times honest.
-  workers: 3,
+  // Chromium renders WebGL in software here. CI runners for private repositories have two cores,
+  // where parallel browsers starve each other to a few frames a second: one at a time there.
+  workers: process.env.CI ? 1 : 3,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {

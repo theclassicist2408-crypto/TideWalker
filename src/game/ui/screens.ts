@@ -414,7 +414,7 @@ export class Ui {
   private flash(text: string): void {
     const el = h('div', { class: 'toast', role: 'status', text });
     this.current?.append(el);
-    window.setTimeout(() => el.remove(), 1800);
+    window.setTimeout(() => el.remove(), 2600);
   }
 
   private levels(area: number): HTMLElement {

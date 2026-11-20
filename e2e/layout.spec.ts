@@ -79,14 +79,13 @@ test.describe('layout and accessibility across devices', () => {
     });
     await expect(page.locator('.settings')).toBeVisible();
     const view = page.viewportSize()!;
-    const rows = page.locator('.settings .row');
-    const n = await rows.count();
-    expect(n).toBeGreaterThanOrEqual(8);
-    for (let i = 0; i < n; i++) {
-      const b = await rows.nth(i).boundingBox();
-      if (!b) continue;
+    // Measured in one pass: on a slow software-rendered page each round trip is costly.
+    const rects = await page.locator('.settings .row').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ x: r.x, w: r.width })));
+    expect(rects.length).toBeGreaterThanOrEqual(8);
+    for (const b of rects) {
+      if (b.w === 0) continue;
       expect(b.x).toBeGreaterThanOrEqual(0);
-      expect(b.x + b.width).toBeLessThanOrEqual(view.width + 0.5);
+      expect(b.x + b.w).toBeLessThanOrEqual(view.width + 0.5);
     }
   });
 

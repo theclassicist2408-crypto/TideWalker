@@ -66,10 +66,12 @@ export class InputManager {
   /** True while the gamepad's stick is steering, so the keyboard does not override it. */
   private padSteering = false;
   private padHeld = new Set<ControlButton>();
-  /** Menu direction held on the pad (-1, 0, 1 per axis) and when it next repeats. */
+  /** Menu direction held on the pad (-1, 0, 1 per axis), how long it has been held, and when it next repeats (ms). */
   private navX = 0;
   private navY = 0;
+  private navHeld = 0;
   private navAt = 0;
+  private navLast = 0;
   /** Family of the connected controller, or null: compared each frame to announce changes. */
   private padSeen: PadFamily | null = null;
   /** Called when a controller or arrow key asks to move through a menu, choose or go back. */
@@ -327,16 +329,27 @@ export class InputManager {
     }
   }
 
-  /** Stick or d-pad on a menu: one step on the push, then repeats while held. */
+  /**
+   * Stick or d-pad on a menu: one step on the push, then repeats while held. Hold time counts at
+   * most 100 ms a frame, so on a struggling device one press is still one step.
+   */
   private menuNav(x: number, y: number, now: number): void {
     const dx = Math.abs(x) > 0.6 ? Math.sign(x) : 0;
     const dy = Math.abs(y) > 0.6 ? Math.sign(y) : 0;
     const changed = dx !== this.navX || dy !== this.navY;
+    const step = Math.min(100, Math.max(0, now - this.navLast));
+    this.navLast = now;
     this.navX = dx;
     this.navY = dy;
     if (dx === 0 && dy === 0) return;
-    if (!changed && now < this.navAt) return;
-    this.navAt = now + (changed ? NAV_DELAY : NAV_REPEAT);
+    if (changed) {
+      this.navHeld = 0;
+      this.navAt = NAV_DELAY;
+    } else {
+      this.navHeld += step;
+      if (this.navHeld < this.navAt) return;
+      this.navAt = this.navHeld + NAV_REPEAT;
+    }
     if (dy !== 0) this.onMenu?.(dy < 0 ? 'prev' : 'next');
     else this.onMenu?.(dx < 0 ? 'left' : 'right');
   }

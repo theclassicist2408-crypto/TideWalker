@@ -18,25 +18,12 @@ test.describe('keyboard', () => {
     expect((await game.snapshot()).x - a.x).toBeGreaterThan(40);
 
     await page.waitForTimeout(300);
-    const rise = game.run(
-      (g) =>
-        new Promise<number>((resolve) => {
-          const y0 = g.world.player.y;
-          let top = y0;
-          const end = performance.now() + 800;
-          const tick = (): void => {
-            top = Math.min(top, g.world.player.y);
-            if (performance.now() < end) requestAnimationFrame(tick);
-            else resolve(y0 - top);
-          };
-          tick();
-        }),
-    );
+    const rise = await game.watchRise();
     await page.keyboard.down('Space');
     await page.waitForTimeout(250);
+    await game.frames(2);
     await page.keyboard.up('Space');
-    expect(await rise).toBeGreaterThan(40);
-
+    await expect.poll(rise).toBeGreaterThan(40);
 
     await page.keyboard.press('Escape');
     await game.waitState('paused');
@@ -81,26 +68,40 @@ async function plugIn(page: Page, id: string): Promise<void> {
   }, id);
 }
 
-/** Holds a controller button (standard-layout index) for `ms`. */
-async function tapPad(page: Page, button: number, ms = 120): Promise<void> {
-  const set = (on: boolean): Promise<void> =>
-    page.evaluate(
-      ([b, v]) => {
-        const p = (window as unknown as { __pads: { buttons: { pressed: boolean; value: number }[] }[] }).__pads[0];
-        p.buttons[b as number] = { pressed: Boolean(v), value: v ? 1 : 0 };
-      },
-      [button, on ? 1 : 0],
-    );
-  await set(true);
-  await page.waitForTimeout(ms);
-  await set(false);
-  await page.waitForTimeout(80);
+/**
+ * Presses a controller button (standard-layout index) for exactly one game frame. Done inside the
+ * page, releasing as soon as the game's frame has read the button: a round trip from the test
+ * can take several frames on a starved machine, and a held direction repeats on menus.
+ */
+async function tapPad(page: Page, button: number): Promise<void> {
+  await page.evaluate(
+    (b) =>
+      new Promise<void>((resolve) => {
+        const w = window as unknown as {
+          __pads: { buttons: { pressed: boolean; value: number }[] }[];
+          __tide: { input: { pad: { slots: Map<number, { prev: Set<number> }> } } };
+        };
+        const pad = w.__pads[0];
+        // The reader keeps the buttons it last read in `prev`; our frame callback runs after the game's.
+        const read = (): boolean => w.__tide.input.pad.slots.get(0)?.prev.has(b) ?? false;
+        const when = (down: boolean, then: () => void): void => {
+          const check = (): void => (read() === down ? then() : void requestAnimationFrame(check));
+          requestAnimationFrame(check);
+        };
+        pad.buttons[b] = { pressed: true, value: 1 };
+        when(true, () => {
+          pad.buttons[b] = { pressed: false, value: 0 };
+          when(false, resolve);
+        });
+      }),
+    button,
+  );
 }
 
 test.describe('controller', () => {
   test('a PlayStation controller drives menus and play, with its own button names', async ({ page, game }) => {
     await plugIn(page, 'DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)');
-    await expect(page.getByRole('status').filter({ hasText: 'PlayStation controller connected' })).toBeVisible();
+    await expect.poll(() => game.run((g) => g.input.padFamily)).toBe('playstation');
     // D-pad down then up returns to Begin; cross chooses it.
     await tapPad(page, 13);
     await expect(page.getByRole('button', { name: 'Begin' })).not.toBeFocused();

@@ -72,6 +72,40 @@ export class GameDriver {
     await this.page.waitForFunction((s) => (window as never as { __tide: { state: string } }).__tide.state === s, state, { timeout: 60_000 });
   }
 
+  /** Waits for `n` rendered frames: the game reads its input once per frame, however slow. */
+  async frames(n = 3): Promise<void> {
+    await this.page.evaluate(
+      (count) =>
+        new Promise<void>((resolve) => {
+          let left = count;
+          const tick = (): void => (--left <= 0 ? resolve() : void requestAnimationFrame(tick));
+          requestAnimationFrame(tick);
+        }),
+      n,
+    );
+  }
+
+  /**
+   * Starts recording the player's highest point, and returns a reader for how far above the
+   * starting height it has been. Installed before the input, so a slow page cannot miss the leap.
+   */
+  async watchRise(): Promise<() => Promise<number>> {
+    await this.run((g) => {
+      const w = window as unknown as { __y0: number; __top: number };
+      w.__y0 = g.world.player.y;
+      w.__top = w.__y0;
+      const tick = (): void => {
+        w.__top = Math.min(w.__top, g.world.player.y);
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+    return () => this.page.evaluate(() => {
+      const w = window as unknown as { __y0: number; __top: number };
+      return w.__y0 - w.__top;
+    });
+  }
+
   /** Marks the tutorial done so the map opens, as a returning player would have it. */
   async skipTutorial(): Promise<void> {
     await this.run((g) => {
@@ -97,6 +131,7 @@ export class GameDriver {
     const c = await this.centre(`.pad-btn[data-btn="${name}"]`);
     await this.touch('touchStart', [{ ...c, id: 1 }]);
     await this.page.waitForTimeout(ms);
+    await this.frames(2);
     await this.touch('touchEnd', []);
   }
 

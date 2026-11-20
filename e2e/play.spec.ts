@@ -27,22 +27,9 @@ test.describe('playing with the touch pad', () => {
 
     await page.waitForTimeout(300);
     const before = await game.snapshot();
-    const rise = game.run(
-      (g) =>
-        new Promise<number>((resolve) => {
-          const y0 = g.world.player.y;
-          let top = y0;
-          const end = performance.now() + 900;
-          const tick = (): void => {
-            top = Math.min(top, g.world.player.y);
-            if (performance.now() < end) requestAnimationFrame(tick);
-            else resolve(y0 - top);
-          };
-          tick();
-        }),
-    );
+    const rise = await game.watchRise();
     await game.holdButton('jump', 250);
-    expect(await rise).toBeGreaterThan(40);
+    await expect.poll(rise).toBeGreaterThan(40);
     expect(before.onGround).toBe(true);
 
     await page.waitForTimeout(800);
