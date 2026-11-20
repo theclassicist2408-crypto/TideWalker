@@ -98,7 +98,7 @@ npm run dev:lan      # the same, reachable from a phone on your Wi-Fi (use the N
 ```bash
 npm run desktop:start    # run as a desktop app (Electron) right now
 npm run desktop:mac      # desktop/release/Tidewalker-2.0.0-arm64.dmg and Tidewalker-2.0.0.dmg
-npm run desktop:win      # desktop/release/Tidewalker-2.0.0-win.zip
+npm run desktop:win      # desktop/release/Tidewalker-2.0.0-setup.exe, -portable.exe and -win.zip
 npm run mobile:android   # needs Android Studio; opens the Android project
 npm run mobile:ios       # needs Xcode; opens the iOS project
 ```

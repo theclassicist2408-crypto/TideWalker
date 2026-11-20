@@ -7,7 +7,7 @@ Tidewalker is a static web app; every native build is a thin wrapper around `dis
 | Any browser | — | `npm run build && npm run preview` | `dist/` | Node 22 |
 | Phone over Wi-Fi | — | `npm run dev:lan` | a `Network:` address to open on the phone | same Wi-Fi |
 | macOS | Electron (`desktop/`) | `npm run desktop:mac` | `desktop/release/*.dmg` (Apple Silicon and Intel) | — |
-| Windows | Electron (`desktop/`) | `npm run desktop:win` | `desktop/release/Tidewalker-2.0.0-win.zip` | — (built on the Mac) |
+| Windows | Electron (`desktop/`) | `npm run desktop:win` | `desktop/release/Tidewalker-2.0.0-setup.exe` (installer), `-portable.exe` (no install), `-win.zip` | — (built on the Mac) |
 | Run the desktop app now | Electron | `npm run desktop:start` | a window | — |
 | Android | Capacitor 8 | `npm run mobile:android` | opens Android Studio | Android Studio (SDK 35+), JDK 21 |
 | iOS | Capacitor 8 | `npm run mobile:ios` | opens Xcode | Xcode 16+, an Apple ID for a device |
@@ -25,9 +25,9 @@ storage and the service worker behave as on the web). F11 / ⌃⌘F toggles full
 - The Mac build is **not signed or notarised**. On first launch, right-click the app → Open.
   For distribution, set `mac.identity` in `desktop/package.json` and notarise with your Apple
   Developer account.
-- The Windows build is a portable zip: unzip and run `Tidewalker.exe`. It is not signed, so
-  SmartScreen will warn. For an installer, change the `win.target` to `nsis` (building that on a
-  Mac needs Wine, or build on Windows).
+- Windows: `Tidewalker-2.0.0-setup.exe` installs with Start menu and desktop shortcuts;
+  `Tidewalker-2.0.0-portable.exe` runs without installing. Neither is signed, so SmartScreen
+  warns until a code-signing certificate is added (`win.certificateFile` in `desktop/package.json`).
 - Saves live in the app's own storage, separate from the browser's.
 
 ## Android and iOS
