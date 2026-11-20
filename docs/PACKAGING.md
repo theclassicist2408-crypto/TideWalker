@@ -22,7 +22,10 @@ dependency of the game. `desktop/prepare.mjs` copies `dist/` into `desktop/web/`
 `desktop/main.cjs` opens one window and serves that build from an `app://` origin (modules,
 storage and the service worker behave as on the web). F11 / ⌃⌘F toggles full screen.
 
-- The Mac build is **not signed or notarised**. On first launch, right-click the app → Open.
+- The Mac build is **ad-hoc signed** (a complete signature with no Apple certificate) and not
+  notarised. Without the full ad-hoc signature, macOS reports a downloaded copy as "damaged".
+  On first launch, right-click the app → Open (macOS 15+: System Settings → Privacy & Security →
+  Open Anyway).
   For distribution, set `mac.identity` in `desktop/package.json` and notarise with your Apple
   Developer account.
 - Windows: `Tidewalker-2.0.0-setup.exe` installs with Start menu and desktop shortcuts;

@@ -38,7 +38,9 @@
         }
       ],
       "icon": "web/icons/icon-1024.png",
-      "identity": null
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "win": {
       "target": [
