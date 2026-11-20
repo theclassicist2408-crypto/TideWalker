@@ -128,7 +128,7 @@ Details, signing and store notes: [docs/PACKAGING.md](docs/PACKAGING.md).
 ```bash
 npm run typecheck    # TypeScript strict mode
 npm run lint         # ESLint
-npm test             # 190 unit and integration tests, including bot playthroughs of every level
+npm test             # 199 unit and integration tests, including bot playthroughs of every level
 npx playwright install chromium   # once
 npm run test:e2e     # 50 end-to-end tests: real touch input, portrait and landscape phones to desktop, offline
 npm run check        # typecheck + lint + unit tests + production build

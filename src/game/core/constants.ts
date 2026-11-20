@@ -30,6 +30,8 @@ export const P = {
   coyote: 0.1,
   buffer: 0.13,
   stepUp: 6,
+  /** Steepest pool bank the builder makes (rise over run): steeper banks cannot be walked. */
+  maxBank: 1.05,
   wallSlide: 70,
   wallJumpX: 190,
   wallJumpY: 530,

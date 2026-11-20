@@ -162,7 +162,9 @@ export class LevelBuilder {
 
   /** Pool with sloped banks: walk in, swim across, walk out. */
   basin(width: number, depth: number, bank = 0.28, under?: (b: this) => void): this {
-    const b = width * bank;
+    // Banks no steeper than about 45 degrees where the pool is wide enough: anything steeper
+    // cannot be walked, so a swimmer would have nowhere to climb out.
+    const b = Math.min(width * 0.42, Math.max(width * bank, depth / P.maxBank));
     const x0 = this.x;
     this.point(x0 + b, this.y + depth);
     this.point(x0 + width - b, this.y + depth);
@@ -274,7 +276,13 @@ export class LevelBuilder {
   /** An underwater foe at a depth below the cursor's ground. */
   fish(back: number, down: number, range = 130, elite = false): this {
     const x = this.x - back;
-    this.data.enemies.push({ kind: 'needlefish', x, y: this.y + down, x0: x - range, x1: x + range, elite });
+    const y = this.y + down;
+    // Its patrol stays where the water is deep enough to swim at its depth, clear of the banks.
+    let x0 = x - range;
+    let x1 = x + range;
+    while (x0 < x - 20 && this.groundAt(x0) < y + 24) x0 += 4;
+    while (x1 > x + 20 && this.groundAt(x1) < y + 24) x1 -= 4;
+    this.data.enemies.push({ kind: 'needlefish', x, y, x0, x1, elite });
     return this;
   }
 

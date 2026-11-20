@@ -403,13 +403,21 @@ function integrate(w: World, dt: number): void {
   let nx = clamp(p.x + p.vx * dt, w.minX, w.maxX);
   const dx = nx - p.x;
   let touched = 0;
+  let slid = false;
   if (dx !== 0) {
     const dir = dx > 0 ? 1 : -1;
     const lead = nx + dir * P.halfW;
     const allow = P.stepUp + Math.abs(dx) * 1.6;
     // The face of a cave roof stops the creature but gives it nothing to cling to (it has no top).
     const roofFace = ceil.at(lead) > head0 + allow;
-    let blocked = ground.at(lead) < feet0 - allow || roofFace;
+    const groundFace = ground.at(lead) < feet0 - allow;
+    let blocked = groundFace || roofFace;
+    // A slope steeper than a step is still a slope, not a wall: the creature walks or rides up
+    // onto it rather than stopping dead at its foot or clinging to it in the air.
+    if (groundFace && !roofFace && !ground.sheerIn(Math.min(p.x, lead), Math.max(p.x, lead))) {
+      blocked = false;
+      slid = true;
+    }
     if (!blocked) {
       for (let i = 0; i < w.blocks.length; i++) {
         const b = w.blocks[i];
@@ -458,6 +466,9 @@ function integrate(w: World, dt: number): void {
       ny = g - P.halfH;
       p.vy = 0;
       p.onGround = !p.swim;
+    } else if (slid) {
+      // Rising into a slope: lifted out of it, still rising.
+      ny = g - P.halfH;
     }
   } else if (wasOnGround && !p.swim && p.vy >= 0 && !p.jumping && g - (ny + P.halfH) < 9) {
     ny = g - P.halfH;

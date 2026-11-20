@@ -36,6 +36,41 @@ export const ENEMY: Record<EnemyKind, Stat> = {
 
 export const ENEMY_KINDS = Object.keys(ENEMY) as EnemyKind[];
 
+/** A foe walking off a drop deeper than this turns back instead (px). */
+const LEDGE = 40;
+
+/**
+ * Whether moving a foe to `nx` would take it into a wall, a cave roof's face, a stone block or a
+ * closed ward, or (for walkers on patrol) off a ledge. Slopes are walkable; only sheer faces stop.
+ */
+function foeBlocked(w: World, e: EnemyState, s: Stat, nx: number): boolean {
+  const dir = nx > e.x ? 1 : -1;
+  const lead = nx + dir * s.r * 0.6;
+  const walker = s.move === 'ground' || s.move === 'still';
+  // Walkers stand on their feet (a buried burrower on the surface above it); flyers and swimmers
+  // may brush low ground with their lower half.
+  const feet = walker ? Math.min(e.y + s.r, w.ground.at(e.x)) : e.y + s.r * 0.4;
+  const head = e.y - s.r * 0.6;
+  const lo = Math.min(e.x, lead);
+  const hi = Math.max(e.x, lead);
+  const g = w.ground.at(lead);
+  if (g < feet - 6 && w.ground.sheerIn(lo, hi)) return true;
+  const c = w.ceil.at(lead);
+  if (c > head && c > w.ceil.at(e.x) + 4) return true;
+  if (walker && e.onGround && e.mode === 'idle' && e.kind !== 'mite' && g > w.ground.at(e.x) + LEDGE) return true;
+  for (let i = 0; i < w.blocks.length; i++) {
+    const b = w.blocks[i];
+    if (b.broken || feet <= b.y + 2 || head >= b.y + b.h - 2) continue;
+    if (lead > b.x && lead < b.x + b.w && !(e.x > b.x && e.x < b.x + b.w)) return true;
+  }
+  for (let i = 0; i < w.gates.length; i++) {
+    const gt = w.gates[i];
+    if (gt.open || feet < gt.y - gt.h || head > gt.y) continue;
+    if ((e.x - gt.x) * (lead - gt.x) <= 0 && e.x !== gt.x) return true;
+  }
+  return false;
+}
+
 export function spawnEnemy(w: World, kind: EnemyKind, x: number, y: number, x0: number, x1: number, elite: boolean, arena: number, wave: number): EnemyState {
   const s = ENEMY[kind];
   const hp = Math.round(s.hp * (1 + 0.08 * (w.tier - 1)) * w.diff.enemyHp * (elite ? 1.5 : 1));
@@ -540,10 +575,15 @@ export function updateEnemies(w: World, dt: number): void {
       }
     }
 
-    // Movement.
+    // Movement. Walls, cave-roof faces, stone blocks and closed wards stop a foe as they stop the
+    // creature: nothing walks or flies through the level.
+    const nx = e.x + e.vx * dt;
+    if (nx !== e.x && foeBlocked(w, e, s, nx)) {
+      e.vx = 0;
+      if (e.mode === 'idle') e.facing = nx > e.x ? -1 : 1;
+    } else e.x = nx;
     if (s.move === 'ground' && e.mode !== 'hidden' && !(e.kind === 'burrower' && e.mode === 'windup')) {
       e.vy = Math.min(700, e.vy + 1500 * dt);
-      e.x += e.vx * dt;
       e.y += e.vy * dt;
       const floor = w.ground.at(e.x) - s.r;
       e.onGround = false;
@@ -551,14 +591,21 @@ export function updateEnemies(w: World, dt: number): void {
         e.y = floor;
         e.vy = 0;
         e.onGround = true;
+      } else if (e.vy < 0) {
+        // A leaping foe bumps its head on a cave roof.
+        const roof = w.ceil.at(e.x) + s.r;
+        if (e.y < roof && roof < floor) {
+          e.y = roof;
+          e.vy = 0;
+        }
       }
     } else if (s.move === 'still') {
-      e.x += e.vx * dt;
       e.y = w.ground.at(e.x) - s.r;
     } else {
-      e.x += e.vx * dt;
       e.y += e.vy * dt;
       const floor = w.ground.at(e.x) - s.r;
+      const roof = w.ceil.at(e.x) + s.r;
+      if (e.y < roof && roof < floor) e.y = roof;
       if (e.y > floor) e.y = floor;
       if (s.move === 'swim') {
         const surface = w.waterAt(e.x) + 10;

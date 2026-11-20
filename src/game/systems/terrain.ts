@@ -42,6 +42,31 @@ export class Heightfield {
     return this.ys[i] + ((this.ys[i + 1] - this.ys[i]) * (x - x0)) / (x1 - x0);
   }
 
+  /**
+   * True if a sheer face (a vertical edge, or a segment steeper than `steep`) taller than `minH`
+   * lies within [x0, x1]. Slopes up to `steep` are surfaces to stand on, not walls.
+   */
+  sheerIn(x0: number, x1: number, minH = 4, steep = 2.5): boolean {
+    const xs = this.xs;
+    const ys = this.ys;
+    const n = xs.length;
+    if (n < 2) return false;
+    // First vertex at or before x0, found by bisection.
+    let lo = 0;
+    let hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (xs[mid] <= x0) lo = mid;
+      else hi = mid - 1;
+    }
+    for (let i = lo; i < n - 1 && xs[i] <= x1; i++) {
+      const rise = Math.abs(ys[i + 1] - ys[i]);
+      if (rise <= minH || xs[i + 1] < x0) continue;
+      if (rise > steep * (xs[i + 1] - xs[i])) return true;
+    }
+    return false;
+  }
+
   /** Highest surface (smallest y) across [x0, x1], sampled at the ends and every interior vertex. */
   minIn(x0: number, x1: number): number {
     let best = Math.min(this.at(x0), this.at(x1));

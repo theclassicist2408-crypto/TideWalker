@@ -14,6 +14,7 @@ run; "Manual" items need a person with a real device and are **not** covered by 
 | Gifts | Ten distinct gifts; each usable, then on cooldown; Lumen cost enforced | `tests/combat.test.ts` |
 | Economy | Plasma drops by rank, banking at lanterns, loss on a fall, none in the tutorial; chests open once and stay open; trials placed past the goal, entered by pushing up, fenced, exited only after the fight, a fall returns to the lantern, no goal from inside; every sword's art; Third Cut and Rising Cut; relics spent once; Forge prices, caps and loadout; sword and technique unlocks; sanitising | `tests/economy.test.ts` |
 | Training | The tutorial asks for all sixteen moves behind ordered gates; a gate opens only after each move twice; counts are capped and announced; only counted in the tutorial; ground and air dash separate; combo and charged strike count; the healing lesson always has a wound and Essence | `tests/training.test.ts` |
+| Terrain | Sheer faces told from slopes; every slope in every level walkable (pool banks no steeper than ~46°); no clinging to slopes, which are walked or ridden up; foes turn at walls, stone blocks and closed wards, do not walk off cliffs on patrol, and flyers stay under cave roofs | `tests/terrain.test.ts` |
 | Controllers | Presses on the frame only, held-at-connect ignored, non-controller HID devices ignored, dead zone and d-pad; PlayStation / Xbox / Switch told apart in Chrome, Firefox and Safari id formats; button names per family; unmapped Sony pads (square first, hat-switch d-pad); the last-pressed of several pads takes over; dash on face button and trigger; rumble follows the Vibration setting | `tests/gamepad.test.ts` |
 | Controllers (browser) | A PlayStation pad chooses Begin with the d-pad and ✕, strikes with □, hides the touch pad, shows stick prompts, pauses with Options and resumes with ○; unplugging pauses; Settings lists the buttons by the connected pad's names | `e2e/desktop.spec.ts` |
 | Forge (browser) | Buying an upgrade, refusing an unaffordable one, a bought sword carried into play | `e2e/menus.spec.ts` |
@@ -35,7 +36,7 @@ run; "Manual" items need a person with a real device and are **not** covered by 
 | Offline | Reload and play with the network off after the first visit | `e2e/performance.spec.ts` |
 | Console | Any console error or uncaught exception fails the e2e test that produced it | `e2e/support.ts` |
 
-Latest results: **190 / 190** unit and integration tests, **50 / 50** end-to-end tests, lint and
+Latest results: **199 / 199** unit and integration tests, **50 / 50** end-to-end tests, lint and
 typecheck clean, production build succeeds; the verification bot passes all 323 level runs.
 
 ## Manual — to do on real hardware before release

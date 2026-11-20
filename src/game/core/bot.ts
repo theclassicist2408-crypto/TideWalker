@@ -602,7 +602,9 @@ export class Bot {
         const d = Math.hypot(p.x - z.x, p.y - z.y);
         if (d < z.w + 26) {
           flee = p.x >= z.x ? 1 : -1;
-          if (z.warn < 0.3) fleeUrgent = true;
+          // Dash only if still inside the ring: a dash carries far, and a burrower that has just
+          // erupted is open to a blow from someone who stepped only just clear.
+          if (z.warn < 0.3 && d < z.w + 4) fleeUrgent = true;
         }
         continue;
       }
