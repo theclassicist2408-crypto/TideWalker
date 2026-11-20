@@ -3,6 +3,7 @@ import { AudioEngine } from '../audio/engine';
 import { Haptics } from '../effects/haptics';
 import { GameRenderer } from '../effects/renderer';
 import { bossDef } from '../entities/bosses';
+import type { PadFamily } from '../input/gamepad';
 import { InputManager } from '../input/input';
 import { allAreas, areaCount, areaInfo, getLevel, getTutorial } from '../levels';
 import { makeDriftLevel, titleLevel } from '../levels/drift';
@@ -86,6 +87,8 @@ export class Game implements UiHost {
     this.input.onCycle = () => this.cycleGift();
     this.input.onCycleRelic = () => this.cycleRelic();
     this.input.onMenu = (a) => this.ui.navigate(a);
+    this.input.onPadChange = (name) => this.controllerChanged(name);
+    this.haptics.rumble = (strong, weak, ms) => this.input.rumble(strong, weak, ms);
     this.hud.onPause = () => this.togglePause();
     this.hud.onCycle = () => this.cycleGift();
     this.hud.onRelic = () => this.input.tapItem();
@@ -257,7 +260,7 @@ export class Game implements UiHost {
     this.loop.reset();
     this.hintKind = null;
     this.hintsSeen.clear();
-    this.hud?.setHint(null, false);
+    this.hud?.setHint(null);
     this.hud?.setBoss(null, 0);
     this.hud?.setTimer(null);
     if (this.bot) this.bot = new Bot(this.world, true);
@@ -275,6 +278,20 @@ export class Game implements UiHost {
       fn();
       window.setTimeout(() => this.fade.classList.remove('on'), 50);
     }, 220);
+  }
+
+  /** A controller was connected or lost. Losing it mid-fight pauses, so nothing happens unseen. */
+  private controllerChanged(name: string | null): void {
+    const text = name ? `${name} connected` : 'Controller disconnected';
+    if (!name && this.state === 'playing' && !this.bot) this.pause();
+    if (this.state === 'playing') this.hud.showNote(text);
+    else this.ui.notify(text);
+    this.ui.controllerChanged();
+  }
+
+  /** UiHost: the controller in use, so menus can name its buttons. */
+  controller(): PadFamily | null {
+    return this.input.padFamily;
   }
 
   private togglePause(): void {
@@ -413,6 +430,7 @@ export class Game implements UiHost {
     this.stateT += dt;
     const frozen = this.state === 'paused';
     this.input.pollGamepad(now, this.state === 'playing' && !this.bot);
+    this.hud.setInputMode(this.input.mode);
 
     if (!frozen) {
       const w = this.world;
@@ -495,7 +513,7 @@ export class Game implements UiHost {
     if (kind !== this.hintKind) {
       this.hintKind = kind;
       this.hintT = 0;
-      this.hud.setHint(kind, this.input.keyboardActive);
+      this.hud.setHint(kind, this.input.mode, this.input.padFamily);
     }
     if (!kind) return;
     this.hintT += dt;
@@ -515,7 +533,7 @@ export class Game implements UiHost {
     this.hintsSeen.add(kind);
     if (this.session.mode !== 'tutorial') this.save.markHint(kind);
     this.hintKind = null;
-    this.hud.setHint(null, false);
+    this.hud.setHint(null);
   }
 
   private onEvent(e: GameEvent): void {

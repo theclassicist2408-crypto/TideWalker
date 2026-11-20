@@ -84,7 +84,9 @@ button {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+.nav-focus button:focus,
+.nav-focus input:focus {
   outline: 2px solid var(--warm);
   outline-offset: 3px;
 }
@@ -505,6 +507,11 @@ input:focus-visible {
 
 .hud.has-gift .pad-ability {
   display: flex;
+}
+
+/* A keyboard or controller is in use: the touch pad steps aside until the screen is touched. */
+.hud.pad-hidden .pad {
+  display: none;
 }
 
 /* Keyboard and mouse: the pad is not needed. */
@@ -1703,4 +1710,28 @@ input:focus-visible {
     transform: none;
     min-width: 0;
   }
+}
+
+/* Settings: what each controller button does. */
+.pad-map {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  margin: 4px 0 8px;
+  font-size: 0.9em;
+}
+
+.pad-map dt {
+  min-width: 2.2em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  text-align: center;
+  font-weight: 600;
+}
+
+.pad-map dd {
+  margin: 0;
+  align-self: center;
+  opacity: 0.85;
 }

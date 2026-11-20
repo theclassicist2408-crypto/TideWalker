@@ -14,7 +14,8 @@ run; "Manual" items need a person with a real device and are **not** covered by 
 | Gifts | Ten distinct gifts; each usable, then on cooldown; Lumen cost enforced | `tests/combat.test.ts` |
 | Economy | Plasma drops by rank, banking at lanterns, loss on a fall, none in the tutorial; chests open once and stay open; trials placed past the goal, entered by pushing up, fenced, exited only after the fight, a fall returns to the lantern, no goal from inside; every sword's art; Third Cut and Rising Cut; relics spent once; Forge prices, caps and loadout; sword and technique unlocks; sanitising | `tests/economy.test.ts` |
 | Training | The tutorial asks for all sixteen moves behind ordered gates; a gate opens only after each move twice; counts are capped and announced; only counted in the tutorial; ground and air dash separate; combo and charged strike count; the healing lesson always has a wound and Essence | `tests/training.test.ts` |
-| Gamepad | Presses on the frame only, held-at-connect ignored, non-standard devices ignored, dead zone and d-pad | `tests/gamepad.test.ts` |
+| Controllers | Presses on the frame only, held-at-connect ignored, non-controller HID devices ignored, dead zone and d-pad; PlayStation / Xbox / Switch told apart in Chrome, Firefox and Safari id formats; button names per family; unmapped Sony pads (square first, hat-switch d-pad); the last-pressed of several pads takes over; dash on face button and trigger; rumble follows the Vibration setting | `tests/gamepad.test.ts` |
+| Controllers (browser) | A PlayStation pad chooses Begin with the d-pad and ✕, strikes with □, hides the touch pad, shows stick prompts, pauses with Options and resumes with ○; unplugging pauses; Settings lists the buttons by the connected pad's names | `e2e/desktop.spec.ts` |
 | Forge (browser) | Buying an upgrade, refusing an unaffordable one, a bought sword carried into play | `e2e/menus.spec.ts` |
 | Bosses | Ten bosses in area order with 2+ phases and rising pressure; unique gifts; 20+ minibosses, 2+ per area; each guardian placed exactly once; bosses guard level 10; telegraph before every attack; phase stagger; defeat clears hazards and opens the arena; difficulty scaling; reset after a fall; every phase of every boss runs without fault | `tests/bosses.test.ts` |
 | Level data | 10 areas × 10 levels with the designed names; unique twists; deterministic build; 12+ enemy kinds all used; 2 shells per area with one hidden; lanterns ≤ 2700 px apart and at every boss door; sensible length | `tests/levels.test.ts` |
@@ -34,13 +35,14 @@ run; "Manual" items need a person with a real device and are **not** covered by 
 | Offline | Reload and play with the network off after the first visit | `e2e/performance.spec.ts` |
 | Console | Any console error or uncaught exception fails the e2e test that produced it | `e2e/support.ts` |
 
-Latest results: **182 / 182** unit and integration tests, **49 / 49** end-to-end tests, lint and
+Latest results: **190 / 190** unit and integration tests, **50 / 50** end-to-end tests, lint and
 typecheck clean, production build succeeds; the verification bot passes all 323 level runs.
 
 ## Manual — to do on real hardware before release
 
 - [ ] Desktop: launch the .dmg on Apple Silicon and Intel Macs and the Windows zip on Windows 10/11;
-      keyboard and an Xbox / PlayStation controller; full screen; resize.
+      keyboard; a DualSense, a DualShock 4, an Xbox and a Switch Pro controller over USB and
+      Bluetooth (buttons, prompts, rumble, unplugging mid-fight); full screen; resize.
 - [ ] Android and iOS builds from `npm run mobile:android` / `mobile:ios` on real phones.
 
 None of these has been done on a physical device yet.

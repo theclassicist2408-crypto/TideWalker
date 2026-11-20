@@ -1,33 +1,42 @@
 import type { HintKind } from '../core/types';
 import { h, icon } from './dom';
+import { PAD_LABELS, type PadFamily, type PadGlyph } from '../input/gamepad';
+import type { InputMode } from '../input/input';
 
-/** Prompt text for each lesson: [touch, keyboard]. Short on purpose. */
-const HINT_TEXT: Record<HintKind, [string, string]> = {
-  move: ['Stick · move', 'A D'],
-  jump: ['Jump', 'Space'],
-  double: ['Jump again in the air', 'Space, twice'],
-  wall: ['Push into the wall · Jump', 'Hold toward the wall · Space'],
-  dash: ['Dash', 'Shift'],
-  airdash: ['Dash in the air', 'Shift in the air'],
-  swim: ['Stick to swim · Jump to leap out', 'WASD · Space to leap out'],
-  dive: ['Stick down · dive', 'S · dive'],
-  glide: ['Hold Jump while falling', 'Hold Space while falling'],
-  attack: ['Strike', 'X or left click'],
-  downstrike: ['Stick down + Strike, in the air', 'S + X, in the air'],
-  charge: ['Hold Strike · let go', 'Hold X or left click · let go'],
-  pulse: ['Tap Light · pulse', 'Tap E or right click'],
-  glow: ['Hold Light · glow', 'Hold E or right click'],
-  danger: ['Light is seen. Go dark.', 'Light is seen. Go dark.'],
-  heal: ['Hold Mend when it is safe', 'Hold Q when it is safe'],
-  bench: ['Lanterns bring you back here', 'Lanterns bring you back here'],
-  pause: ['Pause · top corner', 'Esc · pause'],
-  boss: ['A guardian shows its strength', 'A guardian shows its strength'],
-  rematch: ['Fallen guardians can be fought again from the map', 'Fallen guardians can be fought again from the map'],
-  ability: ['Gift · tap its icon to switch', 'F · 1 to switch'],
-  chest: ['Strike the chest open', 'X · strike it open'],
-  upstrike: ['Stick up + Strike', 'W + X'],
-  combo: ['Strike three times, quickly', 'X X X'],
-  trial: ['Stand in the arch · push up', 'Stand in the arch · W'],
+/** Puts a controller's own button names into a prompt. */
+export function padText(text: string, family: PadFamily | null): string {
+  const labels = PAD_LABELS[family ?? 'xbox'];
+  return text.replace(/\{(\w+)\}/g, (_, g: string) => labels[g as PadGlyph] ?? g);
+}
+
+/** Prompt text for each lesson: [touch, keyboard, controller]. Short on purpose. `{south}` and the like
+ * become the button names of the controller in hand. */
+const HINT_TEXT: Record<HintKind, [string, string, string]> = {
+  move: ['Stick · move', 'A D', 'Left stick · move'],
+  jump: ['Jump', 'Space', 'Jump · {south}'],
+  double: ['Jump again in the air', 'Space, twice', '{south} again in the air'],
+  wall: ['Push into the wall · Jump', 'Hold toward the wall · Space', 'Push into the wall · {south}'],
+  dash: ['Dash', 'Shift', 'Dash · {east}'],
+  airdash: ['Dash in the air', 'Shift in the air', '{east} in the air'],
+  swim: ['Stick to swim · Jump to leap out', 'WASD · Space to leap out', 'Left stick to swim · {south} to leap out'],
+  dive: ['Stick down · dive', 'S · dive', 'Stick down · dive'],
+  glide: ['Hold Jump while falling', 'Hold Space while falling', 'Hold {south} while falling'],
+  attack: ['Strike', 'X or left click', 'Strike · {west}'],
+  downstrike: ['Stick down + Strike, in the air', 'S + X, in the air', 'Stick down + {west}, in the air'],
+  charge: ['Hold Strike · let go', 'Hold X or left click · let go', 'Hold {west} · let go'],
+  pulse: ['Tap Light · pulse', 'Tap E or right click', 'Tap {north} · pulse'],
+  glow: ['Hold Light · glow', 'Hold E or right click', 'Hold {north} · glow'],
+  danger: ['Light is seen. Go dark.', 'Light is seen. Go dark.', 'Light is seen. Go dark.'],
+  heal: ['Hold Mend when it is safe', 'Hold Q when it is safe', 'Hold {rb} when it is safe'],
+  bench: ['Lanterns bring you back here', 'Lanterns bring you back here', 'Lanterns bring you back here'],
+  pause: ['Pause · top corner', 'Esc · pause', '{start} · pause'],
+  boss: ['A guardian shows its strength', 'A guardian shows its strength', 'A guardian shows its strength'],
+  rematch: ['Fallen guardians can be fought again from the map', 'Fallen guardians can be fought again from the map', 'Fallen guardians can be fought again from the map'],
+  ability: ['Gift · tap its icon to switch', 'F · 1 to switch', 'Gift · {lb} · {select} to switch'],
+  chest: ['Strike the chest open', 'X · strike it open', '{west} · strike it open'],
+  upstrike: ['Stick up + Strike', 'W + X', 'Stick up + {west}'],
+  combo: ['Strike three times, quickly', 'X X X', '{west} {west} {west}'],
+  trial: ['Stand in the arch · push up', 'Stand in the arch · W', 'Stand in the arch · stick up'],
 };
 
 const BUTTONS: [string, string, string][] = [
@@ -71,7 +80,8 @@ export class Hud {
   private lastDrills = '';
   private last = '';
   private lastBoss = '';
-  private lastHint: HintKind | null = null;
+  private lastHint: string | null = null;
+  private lastMode: InputMode | null = null;
   private lastTimer = -1;
   private lastGift = '';
   private lastDistance = -1;
@@ -254,15 +264,24 @@ export class Hud {
     this.distance.textContent = `${m} m`;
   }
 
-  setHint(kind: HintKind | null, keyboard: boolean): void {
-    if (kind === this.lastHint) return;
-    this.lastHint = kind;
+  setHint(kind: HintKind | null, mode: InputMode = 'touch', family: PadFamily | null = null): void {
+    const key = kind ? `${kind}:${mode}:${family}` : null;
+    if (key === this.lastHint) return;
+    this.lastHint = key;
     if (!kind) {
       this.hint.classList.remove('on');
       return;
     }
-    this.hint.textContent = HINT_TEXT[kind][keyboard ? 1 : 0];
+    const [touch, keys, pad] = HINT_TEXT[kind];
+    this.hint.textContent = mode === 'pad' ? padText(pad, family) : mode === 'keys' ? keys : touch;
     this.hint.classList.add('on');
+  }
+
+  /** The touch pad steps aside while a keyboard or controller is in use. */
+  setInputMode(mode: InputMode): void {
+    if (mode === this.lastMode) return;
+    this.lastMode = mode;
+    this.root.classList.toggle('pad-hidden', mode !== 'touch');
   }
 
   showCard(eyebrow: string, title: string, line: string): void {

@@ -78,9 +78,27 @@ repository contains no binary art or audio and nothing borrowed.
 | Enter a trial arch | Push the stick up | W |
 | Pause | Pause button | Esc / P |
 
-Gamepads (standard layout): left stick or d-pad to move, A jump, X strike (hold for the art),
-B dash, Y light, RB mend, LB gift, RT relic, Start pause, Select switch gift; the d-pad and A/B
-also drive the menus. The pad mirrors for left-handed play (Settings → Controls). Portrait and
+**Controllers.** PlayStation (DualSense, DualShock 4), Xbox, Switch Pro and most other USB or
+Bluetooth controllers work as soon as they are connected, in menus and in play, on Mac, Windows,
+Android, iPhone/iPad and in the browser. Prompts and the Settings screen use the names on the
+controller in hand (✕ ○ □ △ on PlayStation, A B X Y on Xbox, and so on), the controller rumbles on
+hits and landings (Settings → Vibration), and pulling it out mid-fight pauses the game. With
+several connected, the one pressed last takes over.
+
+| Action | PlayStation | Xbox | Switch |
+| --- | --- | --- | --- |
+| Move, aim · menus | Left stick or d-pad | Left stick or d-pad | Left stick or d-pad |
+| Jump | ✕ | A | B |
+| Strike (hold for the sword's art) | □ | X | Y |
+| Dash | ○ or L2 | B or LT | A or ZL |
+| Pulse (tap) · Glow (hold) | △ | Y | X |
+| Mend (hold) | R1 | RB | R |
+| Use gift · switch gift | L1 · Create | LB · View | L · − |
+| Use relic | R2 | RT | ZR |
+| Pause | Options | Menu | + |
+| Menus: choose · back | ✕ · ○ | A · B | A · B |
+
+The pad mirrors for left-handed play (Settings → Controls). Portrait and
 landscape both work.
 
 ## Run it locally
@@ -110,9 +128,9 @@ Details, signing and store notes: [docs/PACKAGING.md](docs/PACKAGING.md).
 ```bash
 npm run typecheck    # TypeScript strict mode
 npm run lint         # ESLint
-npm test             # 182 unit and integration tests, including bot playthroughs of every level
+npm test             # 190 unit and integration tests, including bot playthroughs of every level
 npx playwright install chromium   # once
-npm run test:e2e     # 49 end-to-end tests: real touch input, portrait and landscape phones to desktop, offline
+npm run test:e2e     # 50 end-to-end tests: real touch input, portrait and landscape phones to desktop, offline
 npm run check        # typecheck + lint + unit tests + production build
 npm run verify:levels   # table of the bot's run through every level on every difficulty
 ```

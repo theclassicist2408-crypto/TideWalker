@@ -3,6 +3,8 @@ import { ALL_RELICS, ALL_STYLES, ALL_SWORDS, FORGE, LEVELS_PER_AREA, RELICS, STY
 import type { Difficulty } from '../core/types';
 import { formatTime } from '../core/util';
 import type { BuyResult, SaveStore, Settings } from '../save/save';
+import { PAD_LABELS, PAD_NAMES, type PadFamily } from '../input/gamepad';
+import type { MenuAction } from '../input/input';
 import { h, icon, ROMAN } from './dom';
 
 export interface LevelInfo {
@@ -55,6 +57,8 @@ export interface UiHost {
   quitToTitle(then?: 'areas'): void;
   settingsChanged(): void;
   sound(kind: 'tap' | 'open' | 'back' | 'toggle'): void;
+  /** The controller in use, if any: its family names the buttons on the Settings screen. */
+  controller(): PadFamily | null;
 }
 
 export type ScreenName = 'title' | 'areas' | 'levels' | 'settings' | 'pause' | 'complete' | 'fall' | 'gallery' | 'drift' | 'ending' | 'credits' | 'forge';
@@ -76,7 +80,10 @@ export class Ui {
   constructor(
     private readonly root: HTMLElement,
     private readonly host: UiHost,
-  ) {}
+  ) {
+    // Focus rings follow arrow keys and controllers, and step aside again for the mouse or touch.
+    window.addEventListener('pointerdown', () => document.body.classList.remove('nav-focus'), { passive: true });
+  }
 
   get active(): ScreenName | null {
     return this.stack.length ? this.stack[this.stack.length - 1].name : null;
@@ -99,13 +106,28 @@ export class Ui {
     this.render();
   }
 
-  /** Gamepad and arrow-key menu navigation: move focus through the screen's buttons, press, go back. */
-  navigate(action: 'prev' | 'next' | 'choose' | 'back'): void {
+  /**
+   * Controller and arrow-key menu navigation: move focus through the screen's buttons, press, go
+   * back. Left and right adjust a focused slider and otherwise move like up and down.
+   */
+  navigate(action: MenuAction): void {
     const screen = this.current;
     if (!screen) return;
     const items = Array.from(screen.querySelectorAll<HTMLElement>('button:not([disabled]), input'));
     if (items.length === 0) return;
+    document.body.classList.add('nav-focus');
     const at = items.indexOf(document.activeElement as HTMLElement);
+    if (action === 'left' || action === 'right') {
+      const el = at >= 0 ? items[at] : null;
+      if (el instanceof HTMLInputElement && el.type === 'range') {
+        if (action === 'left') el.stepDown();
+        else el.stepUp();
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      action = action === 'left' ? 'prev' : 'next';
+    }
     if (action === 'prev' || action === 'next') {
       const next = at < 0 ? 0 : (at + (action === 'next' ? 1 : -1) + items.length) % items.length;
       items[next].focus();
@@ -378,6 +400,16 @@ export class Ui {
     );
   }
 
+  /** A controller came or went: the Settings screen lists its buttons, so redraw it. */
+  controllerChanged(): void {
+    if (this.active === 'settings') this.refresh();
+  }
+
+  /** A short message at the foot of the current screen. */
+  notify(text: string): void {
+    this.flash(text);
+  }
+
   /** A short message at the foot of the current screen. */
   private flash(text: string): void {
     const el = h('div', { class: 'toast', role: 'status', text });
@@ -497,13 +529,14 @@ export class Ui {
         slider('Music', 'music'),
         slider('Effects', 'sfx'),
         h('h4', { text: 'Feel' }),
-        toggle('Haptics', 'haptics'),
+        toggle('Vibration', 'haptics', 'Phone vibration and controller rumble'),
         toggle('Screen shake', 'screenShake'),
         toggle('Reduced motion', 'reducedMotion', 'Calmer camera, fewer particles, no flashes'),
         h('h4', { text: 'Access' }),
         segment<number>('Text size', [[0.9, 'S'], [1, 'M'], [1.2, 'L'], [1.4, 'XL']], () => s().textScale, (v) => set({ textScale: v })),
         toggle('Visual sound cues', 'visualCues', 'Show danger you would otherwise only hear'),
         segment<'left' | 'right'>('Controls', [['left', 'Left hand'], ['right', 'Right hand']], () => s().handed, (v) => set({ handed: v })),
+        ...this.controllerRows(),
         h('h4', { text: 'Difficulty' }),
         segment<Difficulty>('Challenge', [['gentle', 'Gentle'], ['standard', 'Standard'], ['intense', 'Intense']], () => s().difficulty, (v) => set({ difficulty: v }), () => (diffNote.textContent = DIFFICULTY_TEXT[s().difficulty])),
         diffNote,
@@ -514,6 +547,31 @@ export class Ui {
       ),
     );
     return screen;
+  }
+
+  /** What each controller button does, named the way the connected controller names it. */
+  private controllerRows(): HTMLElement[] {
+    const family = this.host.controller();
+    const l = PAD_LABELS[family ?? 'xbox'];
+    const rows: [string, string][] = [
+      ['Left stick · D-pad', 'Move, aim up and down'],
+      [l.south, 'Jump (hold for height, glide)'],
+      [l.west, 'Strike (hold for your sword\'s art)'],
+      [`${l.east} · ${l.lt}`, 'Dash'],
+      [l.north, 'Pulse (tap) · Glow (hold)'],
+      [l.rb, 'Mend (hold)'],
+      [`${l.lb} · ${l.select}`, 'Use gift · switch gift'],
+      [l.rt, 'Use relic'],
+      [l.start, 'Pause'],
+    ];
+    const status = family
+      ? `${PAD_NAMES[family]} connected. Menus: D-pad to move, ${family === 'nintendo' ? `${l.east} to choose, ${l.south}` : `${l.south} to choose, ${l.east}`} to go back.`
+      : 'Plug in or pair a PlayStation, Xbox, Switch or other controller; it works at once, in menus and in play.';
+    return [
+      h('h4', { text: 'Controller' }),
+      h('p', { class: 'note pad-status', text: status }),
+      h('dl', { class: 'pad-map' }, ...rows.flatMap(([b, a]) => [h('dt', { text: b }), h('dd', { text: a })])),
+    ];
   }
 
   private pause(p: { mode: string; title: string; twist: string }): HTMLElement {

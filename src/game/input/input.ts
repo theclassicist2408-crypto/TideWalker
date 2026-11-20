@@ -1,6 +1,14 @@
 import { newIntent, type Intent } from '../core/types';
 import { Controls, type ControlButton } from './controls';
-import { GamepadReader, PAD } from './gamepad';
+import { GamepadReader, PAD, PAD_NAMES, type PadFamily } from './gamepad';
+
+/** Which device the player last used: prompts and the touch pad follow it. */
+export type InputMode = 'touch' | 'keys' | 'pad';
+export type MenuAction = 'prev' | 'next' | 'left' | 'right' | 'choose' | 'back';
+
+/** Holding a direction on a menu repeats after this delay, then at this interval (ms). */
+const NAV_DELAY = 380;
+const NAV_REPEAT = 120;
 
 /**
  * Keyboard: everything sits around WASD so the left hand never travels. The mouse adds strike
@@ -41,7 +49,7 @@ export class InputManager {
   private readonly keys = new Set<string>();
   private readonly intent = newIntent();
   private enabled = false;
-  private usingKeys = false;
+  private inputMode: InputMode = 'touch';
   private stickPointer = -1;
   private stickX = 0;
   private stickY = 0;
@@ -58,8 +66,16 @@ export class InputManager {
   /** True while the gamepad's stick is steering, so the keyboard does not override it. */
   private padSteering = false;
   private padHeld = new Set<ControlButton>();
-  /** Called each frame a gamepad asks to move through a menu (-1 back, +1 forward), choose or go back. */
-  onMenu: ((action: 'prev' | 'next' | 'choose' | 'back') => void) | null = null;
+  /** Menu direction held on the pad (-1, 0, 1 per axis) and when it next repeats. */
+  private navX = 0;
+  private navY = 0;
+  private navAt = 0;
+  /** Family of the connected controller, or null: compared each frame to announce changes. */
+  private padSeen: PadFamily | null = null;
+  /** Called when a controller or arrow key asks to move through a menu, choose or go back. */
+  onMenu: ((action: MenuAction) => void) | null = null;
+  /** Called when a controller is connected (its name) or the last one is lost (null). */
+  onPadChange: ((name: string | null, family: PadFamily | null) => void) | null = null;
 
   constructor(pad: HTMLElement, field: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
@@ -78,7 +94,7 @@ export class InputManager {
       const name = button(e.button);
       if (!this.enabled || !name) return;
       e.preventDefault();
-      this.usingKeys = true;
+      this.inputMode = 'keys';
       this.controls.press(name, e.timeStamp);
     });
     window.addEventListener('pointerup', (e) => {
@@ -90,8 +106,19 @@ export class InputManager {
     field.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  get keyboardActive(): boolean {
-    return this.usingKeys;
+  /** The device the player last used. */
+  get mode(): InputMode {
+    return this.inputMode;
+  }
+
+  /** The family of the controller in use, for button prompts; null when none is connected. */
+  get padFamily(): PadFamily | null {
+    return this.pad.connected ? this.pad.family : null;
+  }
+
+  /** Rumbles the controller, only while it is the device being played with. */
+  rumble(strong: number, weak: number, ms: number): void {
+    if (this.inputMode === 'pad') this.pad.rumble(strong, weak, ms);
   }
 
   setEnabled(on: boolean): void {
@@ -137,7 +164,7 @@ export class InputManager {
           this.first();
           if (!this.enabled || this.stickPointer !== -1) return;
           e.preventDefault();
-          this.usingKeys = false;
+          this.inputMode = 'touch';
           this.stickPointer = e.pointerId;
           zone.setPointerCapture?.(e.pointerId);
           this.stickX = e.clientX;
@@ -176,7 +203,7 @@ export class InputManager {
         this.first();
         if (!this.enabled) return;
         e.preventDefault();
-        this.usingKeys = false;
+        this.inputMode = 'touch';
         el.setPointerCapture?.(e.pointerId);
         el.classList.add('down');
         this.controls.press(name, e.timeStamp);
@@ -200,7 +227,7 @@ export class InputManager {
     }
     if (!this.enabled) {
       // Menus: arrows move between buttons (Enter and Space press them, as browsers do).
-      const nav = e.code === 'ArrowUp' || e.code === 'ArrowLeft' ? 'prev' : e.code === 'ArrowDown' || e.code === 'ArrowRight' ? 'next' : null;
+      const nav: MenuAction | null = e.code === 'ArrowUp' ? 'prev' : e.code === 'ArrowDown' ? 'next' : e.code === 'ArrowLeft' ? 'left' : e.code === 'ArrowRight' ? 'right' : null;
       const inField = e.target instanceof HTMLInputElement;
       if (nav && !inField) {
         e.preventDefault();
@@ -219,7 +246,7 @@ export class InputManager {
     const button = KEYS[e.code];
     if (!button && !DIRS[e.code]) return;
     e.preventDefault();
-    this.usingKeys = true;
+    this.inputMode = 'keys';
     if (e.repeat) return;
     this.keys.add(e.code);
     if (button) this.controls.press(button, e.timeStamp);
@@ -248,26 +275,41 @@ export class InputManager {
   }
 
   /**
-   * Polls the gamepad once per frame. In play it feeds the same Controls as touch and keys;
-   * on menus it moves focus and chooses. Start pauses, Select switches gifts.
+   * Polls the controllers once per frame. In play the pad feeds the same Controls as touch and
+   * keys; on menus it moves focus (holding repeats), chooses and goes back. Start pauses,
+   * Select switches gifts.
    */
   pollGamepad(now: number, playing: boolean): void {
     const f = this.pad.read();
+    const family = f ? f.family : null;
+    if (family !== this.padSeen) {
+      this.padSeen = family;
+      if (!family) {
+        this.releasePad(now);
+        if (this.inputMode === 'pad') this.inputMode = 'keys';
+      }
+      this.onPadChange?.(family ? PAD_NAMES[family] : null, family);
+    }
     if (!f) return;
-    if (f.pressed.size > 0 || f.x !== 0 || f.y !== 0) this.first();
+    if (f.pressed.size > 0 || f.x !== 0 || f.y !== 0) {
+      this.first();
+      this.inputMode = 'pad';
+    }
     if (f.pressed.has(PAD.START)) this.onPauseKey?.();
     if (!playing || !this.enabled) {
       this.releasePad(now);
-      if (f.pressed.has(PAD.UP) || f.pressed.has(PAD.LEFT)) this.onMenu?.('prev');
-      if (f.pressed.has(PAD.DOWN) || f.pressed.has(PAD.RIGHT)) this.onMenu?.('next');
-      if (f.pressed.has(PAD.A)) this.onMenu?.('choose');
-      if (f.pressed.has(PAD.B)) this.onMenu?.('back');
+      this.menuNav(f.x, f.y, now);
+      // Switch controllers confirm with the right button (A) and go back with the bottom one (B).
+      const nintendo = f.family === 'nintendo';
+      if (f.pressed.has(nintendo ? PAD.EAST : PAD.SOUTH)) this.onMenu?.('choose');
+      if (f.pressed.has(nintendo ? PAD.SOUTH : PAD.EAST)) this.onMenu?.('back');
       return;
     }
+    this.navX = this.navY = 0;
     if (f.pressed.has(PAD.SELECT)) this.onCycle?.();
-    this.usingKeys = true;
-    for (const [i, name] of PAD.PLAY) {
-      const down = f.down.has(i);
+    for (const [name, buttons] of PAD.PLAY) {
+      let down = false;
+      for (const i of buttons) down = down || f.down.has(i);
       if (down && !this.padHeld.has(name)) {
         this.padHeld.add(name);
         this.controls.press(name, now);
@@ -283,6 +325,20 @@ export class InputManager {
       this.padSteering = false;
       this.applyKeys();
     }
+  }
+
+  /** Stick or d-pad on a menu: one step on the push, then repeats while held. */
+  private menuNav(x: number, y: number, now: number): void {
+    const dx = Math.abs(x) > 0.6 ? Math.sign(x) : 0;
+    const dy = Math.abs(y) > 0.6 ? Math.sign(y) : 0;
+    const changed = dx !== this.navX || dy !== this.navY;
+    this.navX = dx;
+    this.navY = dy;
+    if (dx === 0 && dy === 0) return;
+    if (!changed && now < this.navAt) return;
+    this.navAt = now + (changed ? NAV_DELAY : NAV_REPEAT);
+    if (dy !== 0) this.onMenu?.(dy < 0 ? 'prev' : 'next');
+    else this.onMenu?.(dx < 0 ? 'left' : 'right');
   }
 
   private releasePad(now: number): void {

@@ -17,6 +17,26 @@ export const HAPTIC_PATTERNS = {
 
 export type HapticName = keyof typeof HAPTIC_PATTERNS;
 
+/**
+ * Controller rumble for each pattern: [heavy motor, light motor] from 0 to 1. Blows and falls
+ * use the heavy motor; small ticks only the light one.
+ */
+const RUMBLE: Record<HapticName, [number, number]> = {
+  glow: [0, 0.25],
+  pulse: [0.55, 0.7],
+  land: [0, 0.3],
+  hardLand: [0.5, 0.4],
+  danger: [0.15, 0.35],
+  sting: [0.6, 0.5],
+  bite: [0.9, 0.7],
+  pickup: [0, 0.2],
+  shell: [0.2, 0.5],
+  checkpoint: [0.2, 0.45],
+  caught: [0.8, 0.8],
+  nearMiss: [0.1, 0.4],
+  ui: [0, 0.15],
+};
+
 /** Native wrappers (Capacitor) can provide richer haptics by defining this bridge on window. */
 interface HapticBridge {
   play(name: HapticName, pattern: readonly number[]): void;
@@ -29,6 +49,8 @@ interface HapticBridge {
  */
 export class Haptics {
   enabled = true;
+  /** Rumbles a connected controller (heavy, light, ms); set by the game when input is ready. */
+  rumble: ((strong: number, weak: number, ms: number) => void) | null = null;
   private lastDanger = 0;
 
   get supported(): boolean {
@@ -43,10 +65,18 @@ export class Haptics {
   play(name: HapticName): void {
     if (!this.enabled) return;
     const pattern = HAPTIC_PATTERNS[name];
+    if (this.rumble) {
+      let ms = 0;
+      for (const v of pattern) ms += v;
+      const [strong, weak] = RUMBLE[name];
+      this.rumble(strong, weak, Math.max(40, ms));
+    }
     const bridge = this.bridge();
     try {
       if (bridge) bridge.play(name, pattern);
-      else if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(pattern as unknown as number[]);
+      // Chrome refuses (and logs) vibration before the page has been touched or clicked; a
+      // controller press does not count, so a pad-only player relies on rumble alone.
+      else if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function' && navigator.userActivation?.hasBeenActive !== false) navigator.vibrate(pattern as unknown as number[]);
     } catch {
       // Vibration can be blocked by the browser; feedback is optional.
     }
